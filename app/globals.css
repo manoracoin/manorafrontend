@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+@layer base {
+  :root {
+    --background: 220 33% 98%;
+    --foreground: 220 10% 15%;
+    --card: 220 33% 97%;
+    --card-foreground: 220 10% 15%;
+    --popover: 220 33% 97%;
+    --popover-foreground: 220 10% 15%;
+    --primary: 220 10% 15%;
+    --primary-foreground: 220 33% 98%;
+    --secondary: 220 33% 94%;
+    --secondary-foreground: 220 10% 15%;
+    --muted: 220 33% 94%;
+    --muted-foreground: 220 10% 45%;
+    --accent: 220 33% 94%;
+    --accent-foreground: 220 10% 15%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 220 33% 92%;
+    --input: 220 33% 92%;
+    --ring: 220 10% 15%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+    --radius: 0.5rem;
+  }
+  .dark {
+    --background: 260 50% 6%;
+    --foreground: 0 0% 98%;
+    --card: 260 50% 8%;
+    --card-foreground: 0 0% 98%;
+    --popover: 260 50% 8%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;
+    --primary-foreground: 0 0% 9%;
+    --secondary: 260 50% 12%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 260 50% 12%;
+    --muted-foreground: 0 0% 63.9%;
+    --accent: 260 50% 12%;
+    --accent-foreground: 0 0% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 260 50% 12%;
+    --input: 260 50% 12%;
+    --ring: 0 0% 83.1%;
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    background: linear-gradient(to bottom right, hsl(var(--background)), hsl(var(--background)));
+    min-height: 100vh;
+  }
+}
+
+/* Custom Tab Styles */
+.custom-tabs {
+  @apply relative;
+}
+
+.custom-tabs [role="tablist"] {
+  @apply flex gap-1 relative z-10 p-1 rounded-xl bg-secondary/50 backdrop-blur-sm;
+}
+
+.custom-tabs [role="tab"] {
+  @apply relative px-6 py-2.5 text-sm font-medium transition-all duration-200 rounded-lg;
+}
+
+.custom-tabs [role="tab"][data-state="active"] {
+  @apply text-primary-foreground;
+}
+
+.custom-tabs [role="tab"][data-state="active"]::before {
+  content: "";
+  @apply absolute inset-0 bg-primary rounded-lg;
+  animation: tabAppear 0.2s ease-out;
+}
+
+.custom-tabs [role="tab"] span {
+  @apply relative z-10;
+}
+
+.custom-tabs-secondary [role="tablist"] {
+  @apply p-0 bg-transparent border-b border-border/50;
+}
+
+.custom-tabs-secondary [role="tab"] {
+  @apply px-4 py-2 rounded-none border-b-2 border-transparent;
+}
+
+.custom-tabs-secondary [role="tab"][data-state="active"] {
+  @apply text-primary border-primary;
+}
+
+.custom-tabs-secondary [role="tab"][data-state="active"]::before {
+  @apply hidden;
+}
+
+@keyframes tabAppear {
+  from {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
