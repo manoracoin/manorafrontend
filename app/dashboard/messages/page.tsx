@@ -206,6 +206,8 @@ export default function MessagesPage() {
   }
 
   const handleSendNewMessage = () => {
+    const selectedProperty = properties.find(p => p.id.toString() === newMessageData.propertyId)
+    if (!selectedProperty) return
     const newMessage = {
       id: Math.max(0, ...messages.map(m => m.id)) + 1,
       ...newMessageData,
@@ -214,7 +216,7 @@ export default function MessagesPage() {
         name: "John Smith",
         avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=400&auto=format&fit=crop&q=60"
       },
-      property: properties.find(p => p.id.toString() === newMessageData.propertyId),
+      property: selectedProperty,
       createdAt: new Date().toISOString(),
       status: "pending",
       replies: []

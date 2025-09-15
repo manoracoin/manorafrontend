@@ -99,7 +99,7 @@ export default function ContractsPage() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">{t('common.back', 'Back')}</span>
+            <span className="hidden sm:inline">{t('common.back')}</span>
           </Button>
           <h2 className="text-xl sm:text-3xl font-semibold sm:font-bold tracking-tight">{t('explorer.activeContracts')}</h2>
         </div>
@@ -107,7 +107,7 @@ export default function ContractsPage() {
           <div className="hidden sm:block relative w-[280px]">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder={t('header.searchPlaceholder', 'Search...') as string}
+              placeholder={t('header.searchPlaceholder')}
               className="pl-8 pr-8"
               value={searchValue}
               onChange={(e) => setSearchValue(e.target.value)}

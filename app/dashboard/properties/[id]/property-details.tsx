@@ -41,7 +41,6 @@ import {
   Building,
   CheckCircle2
 } from "lucide-react"
-import Image from "next/image"
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -55,7 +54,7 @@ import {
 import { useI18n } from "@/components/i18n-provider"
 
 interface Property {
-  id: number
+  id: string
   title: string
   type: string
   location: string
@@ -112,7 +111,7 @@ function ImageEditor({ imageUrl, onSave, onClose }: ImageEditorProps) {
   const handleSave = () => {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    const img = new Image()
+    const img = new window.Image()
 
     img.onload = () => {
       const size = Math.max(img.width, img.height)

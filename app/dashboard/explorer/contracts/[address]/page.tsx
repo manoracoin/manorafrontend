@@ -66,7 +66,7 @@ export default function ContractDetailPage() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            {t('common.back', 'Back')}
+            {t('common.back')}
           </Button>
           <h2 className="text-3xl font-bold tracking-tight">{data.name}</h2>
         </div>

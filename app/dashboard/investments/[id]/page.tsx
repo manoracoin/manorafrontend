@@ -530,7 +530,9 @@ export default function InvestmentsByIdPage() {
                   onClick={(o) => handleOrderClick({ ...o, type: "ask" })}
                   onCreate={({ price, amount }) => {
                     // Inserisce l'ordine creato in cima alla lista (demo client-side)
-                    const newOrder = { id: `a-new-${Date.now()}`, price, amount, user: "you" }
+                    const now = new Date()
+                    const time = now.toTimeString().slice(0, 8)
+                    const newOrder = { id: `a-new-${Date.now()}`, price, amount, user: "you", time }
                     const updated = { ...selectedProperty }
                     updated.orderBook = {
                       ...updated.orderBook,
@@ -558,7 +560,9 @@ export default function InvestmentsByIdPage() {
                   symbol={selectedProperty.symbol}
                   onClick={(o) => handleOrderClick({ ...o, type: "bid" })}
                   onCreate={({ price, amount }) => {
-                    const newOrder = { id: `b-new-${Date.now()}`, price, amount, user: "you" }
+                    const now = new Date()
+                    const time = now.toTimeString().slice(0, 8)
+                    const newOrder = { id: `b-new-${Date.now()}`, price, amount, user: "you", time }
                     const updated = { ...selectedProperty }
                     updated.orderBook = {
                       ...updated.orderBook,

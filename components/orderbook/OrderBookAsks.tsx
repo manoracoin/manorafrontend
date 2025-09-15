@@ -9,6 +9,7 @@ export interface OrderItem {
   price: number
   amount: number
   user: string
+  time: string
 }
 
 interface Props {

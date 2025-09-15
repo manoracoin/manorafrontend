@@ -76,14 +76,14 @@ export default function TransactionsPage() {
         <div className="flex items-center gap-3">
           <Button variant="ghost" onClick={() => router.back()}>
             <ArrowLeft className="h-4 w-4 mr-2" />
-            <span className="hidden sm:inline">{t('common.back', 'Back')}</span>
+            <span className="hidden sm:inline">{t('common.back')}</span>
           </Button>
           <h2 className="text-xl sm:text-3xl font-semibold sm:font-bold tracking-tight">{t('explorer.recentTransactions')}</h2>
         </div>
         <div className="flex items-center gap-2">
           <div className="hidden sm:block relative w-[280px]">
             <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input placeholder={t('header.searchPlaceholder', 'Search...') as string} className="pl-8 pr-8" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} />
+            <Input placeholder={t('header.searchPlaceholder')} className="pl-8 pr-8" value={searchValue} onChange={(e) => setSearchValue(e.target.value)} />
             {searchValue && (
               <button type="button" aria-label="Clear search" className="absolute right-2 top-2.5 p-1 rounded-full hover:bg-muted/60" onClick={() => setSearchValue("")}>
                 <X className="h-4 w-4 text-muted-foreground" />

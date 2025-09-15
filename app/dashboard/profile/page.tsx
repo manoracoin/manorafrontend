@@ -60,7 +60,7 @@ import {
   ImageIcon,
   Info
 } from "lucide-react"
-import Image from "next/image"
+import NextImage from "next/image"
 import { 
   AlertDialog,
   AlertDialogAction,
@@ -365,14 +365,21 @@ export default function ProfilePage() {
     }))
   }
 
-  const handleNestedInputChange = (parent: string, field: string, value: any) => {
-    setFormData(prev => ({
-      ...prev,
-      [parent]: {
-        ...prev[parent as keyof typeof prev],
-        [field]: value
+  const handleNestedInputChange = (
+    parent: keyof typeof formData,
+    field: string,
+    value: any
+  ) => {
+    setFormData(prev => {
+      const parentObj = prev[parent] as Record<string, any>
+      return {
+        ...prev,
+        [parent]: {
+          ...parentObj,
+          [field]: value,
+        },
       }
-    }))
+    })
   }
 
   const renderStepContent = () => {
@@ -554,7 +561,7 @@ export default function ProfilePage() {
       <div className="space-y-6">
         <div className="relative h-[320px] w-full rounded-xl overflow-hidden group">
           <div className="absolute inset-0">
-            <Image
+            <NextImage
               src={coverImage}
               alt="Cover"
               fill
@@ -575,7 +582,7 @@ export default function ProfilePage() {
 
           <div className="absolute bottom-0 left-0 right-0 p-6 flex flex-col sm:flex-row items-center sm:items-end gap-4">
             <div className="relative h-32 w-32 rounded-full border-4 border-background overflow-hidden group/avatar">
-              <Image
+              <NextImage
                 src={profileImage}
                 alt="Profile"
                 fill
