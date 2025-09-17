@@ -1,50 +1,24 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import {
-  Wallet,
-  ArrowUpRight,
-  ArrowDownLeft,
-  Clock,
-  DollarSign,
-  Coins,
-  QrCode,
-  Copy,
-  ExternalLink,
-  AlertCircle,
-  CreditCard,
-  Building,
-  Building2,
-  Landmark,
-  Info,
-  CheckCircle2,
-  MapPin,
-  Percent,
-} from "lucide-react"
-import { Alert, AlertDescription } from "@/components/ui/alert"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { Label } from "@/components/ui/label"
+import { ArrowUpRight, ArrowDownLeft, Copy, Percent, DollarSign, Coins, Building2, QrCode } from "lucide-react"
 import Link from "next/link"
+import Image from "next/image"
 import { useRouter } from "next/navigation"
+import QRCode from "react-qr-code"
+import { useI18n } from "@/components/i18n-provider"
+import LatestBlockCard from "@/components/explorer/cards/LatestBlockCard"
+import TradeMnrPanel from "@/components/wallet/TradeMnrPanel"
+import DepositPanel from "@/components/wallet/DepositPanel"
+import PaymentPanel from "@/components/wallet/PaymentPanel"
+import WithdrawPanel from "@/components/wallet/WithdrawPanel"
+import WithdrawConfirmPanel from "@/components/wallet/WithdrawConfirmPanel"
+import BottomSheet from "@/components/ui/BottomSheet"
+import FiatTransactionsTable from "@/components/wallet/FiatTransactionsTable"
+import ManoraTransactionsTable from "@/components/wallet/ManoraTransactionsTable"
 
 // Move data outside component to prevent recreation on each render
 const tokenizedProperties = [
@@ -128,6 +102,7 @@ const transactions = [
 export default function WalletPage() {
   // State management
   const router = useRouter()
+  const { locale } = useI18n()
   const [showDepositDialog, setShowDepositDialog] = useState(false)
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
   const [showWithdrawDialog, setShowWithdrawDialog] = useState(false)
@@ -135,11 +110,17 @@ export default function WalletPage() {
   const [walletAddress] = useState("0x1234567890abcdef1234567890abcdef12345678")
   const [depositAmount, setDepositAmount] = useState("")
   const [depositCurrency, setDepositCurrency] = useState("")
+  const [depositFiatOnly, setDepositFiatOnly] = useState(false)
   const [paymentMethod, setPaymentMethod] = useState("credit-card")
   const [withdrawAmount, setWithdrawAmount] = useState("")
   const [withdrawCurrency, setWithdrawCurrency] = useState("")
   const [withdrawMethod, setWithdrawMethod] = useState("bank")
+  const [withdrawFiatOnly, setWithdrawFiatOnly] = useState(false)
   const [withdrawDestination, setWithdrawDestination] = useState("")
+  const [showTradeMnr, setShowTradeMnr] = useState<{mode:'buy'|'sell'}|null>(null)
+  const [tradeMnrAmount, setTradeMnrAmount] = useState("")
+  const rateUsdPerMnr = 2.5
+  const [showQrDialog, setShowQrDialog] = useState(false)
 
   // Memoized calculations
   const totalTokenValue = useMemo(() => {
@@ -164,9 +145,20 @@ export default function WalletPage() {
   }, [withdrawAmount, withdrawFee])
 
   // Event handlers
+  const [walletUrl, setWalletUrl] = useState("")
+  useEffect(() => {
+    const base = typeof window !== 'undefined' ? window.location.origin : ''
+    const shortId = walletAddress.slice(0, 8)
+    if (base) setWalletUrl(`${base}/wallet/${shortId}`)
+  }, [walletAddress])
+
   const handleCopyAddress = useCallback(() => {
     navigator.clipboard.writeText(walletAddress)
   }, [walletAddress])
+
+  const handleCopyUrl = useCallback(() => {
+    navigator.clipboard.writeText(walletUrl)
+  }, [walletUrl])
 
   const handleContinueToPayment = useCallback(() => {
     setShowDepositDialog(false)
@@ -186,100 +178,140 @@ export default function WalletPage() {
     setShowWithdrawConfirmDialog(false)
   }, [])
 
+  // Responsive switching è gestito dentro i pannelli estratti
+
+  // Track which card is currently in view on mobile
+  const [activeCard, setActiveCard] = useState<number>(0)
+  const scrollerRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches
+    if (isDesktop) return
+    const ids = ['fiat-card','mnr-card','re-card']
+    const elements = ids.map(id => document.getElementById(id)).filter(Boolean) as HTMLElement[]
+    if (elements.length === 0) return
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries
+        .filter(e => e.isIntersecting)
+        .sort((a,b)=> b.intersectionRatio - a.intersectionRatio)[0]
+      if (visible) {
+        const idx = ids.indexOf(visible.target.id)
+        if (idx !== -1) setActiveCard(idx)
+      }
+    }, { root: scrollerRef.current, rootMargin: "0px -15% 0px -15%", threshold: [0.2, 0.5, 0.8] })
+    elements.forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
+      <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Wallet</h2>
-        <div className="flex gap-2">
-          <Button onClick={() => setShowDepositDialog(true)}>
-            <ArrowDownLeft className="mr-2 h-4 w-4" />
-            Deposit
-          </Button>
-          <Button onClick={() => setShowWithdrawDialog(true)}>
-            <ArrowUpRight className="mr-2 h-4 w-4" />
-            Withdraw
-          </Button>
-          <Link href="/dashboard/wallet/governance">
-            <Button variant="outline">
-              Governance
-            </Button>
-          </Link>
-        </div>
+        <Button variant="ghost" size="icon" className="inline-flex sm:hidden text-muted-foreground hover:text-foreground" aria-label="Show Wallet QR" onClick={() => setShowQrDialog(true)}>
+          <QrCode className="h-5 w-5" />
+        </Button>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">Fiat Balance</h3>
+      <div ref={scrollerRef} className="flex gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:grid sm:gap-4 sm:grid-cols-3 sm:overflow-x-hidden sm:snap-none">
+        <LatestBlockCard
+          // @ts-ignore ids used only for mobile observer
+          id="fiat-card"
+          label="Fiat Wallet"
+          value={4500}
+          subtitle="Available for withdrawal"
+          locale={locale}
+          gradientClassName="bg-gradient-to-br from-sky-500 to-blue-600"
+          icon={DollarSign}
+          rightElement={<Badge variant="secondary" className="bg-white/20 text-white border-white/30">USD</Badge>}
+          footerElement={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => { setDepositCurrency('usd'); setDepositFiatOnly(true); setShowDepositDialog(true) }}>
+                Deposit
+              </Button>
+              <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => { setWithdrawCurrency('usd'); setWithdrawMethod('bank'); setWithdrawFiatOnly(true); setShowWithdrawDialog(true) }}>
+                Withdraw
+              </Button>
+              <Link href="/dashboard/wallet/fiat-transactions" className="hidden sm:block">
+                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30">
+                  History
+                </Button>
+              </Link>
             </div>
-            <Badge variant="secondary">USD</Badge>
-          </div>
-          <p className="text-3xl font-bold">$4,500.00</p>
-          <p className="text-sm text-muted-foreground mt-1">Available for withdrawal</p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">Crypto Balance</h3>
+          }
+        />
+        <LatestBlockCard
+          id="mnr-card"
+          label="Manora Wallet"
+          value={1600}
+          subtitle="MNR"
+          locale={locale}
+          gradientClassName="bg-gradient-to-br from-emerald-500 to-teal-600"
+          icon={Coins}
+          footerElement={
+            <div className="flex gap-2">
+              <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'buy'})}>Buy</Button>
+              <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'sell'})}>Sell</Button>
+              <Link href="/dashboard/wallet/manora-transactions" className="hidden sm:block">
+                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30">History</Button>
+              </Link>
             </div>
-            <Badge variant="secondary">MNR</Badge>
-          </div>
-          <p className="text-3xl font-bold">1,600 MNR</p>
-          <p className="text-sm text-muted-foreground mt-1">≈ $4,000.00 USD</p>
-        </Card>
-
-        <Card className="p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
-              <Building2 className="h-5 w-5 text-muted-foreground" />
-              <h3 className="text-lg font-semibold">Real Estate Tokens</h3>
-            </div>
-            <Badge variant="secondary">Total Value</Badge>
-          </div>
-          <p className="text-3xl font-bold">${totalTokenValue.toLocaleString()}</p>
-          <p className="text-sm text-muted-foreground mt-1">Across {tokenizedProperties.length} properties</p>
-        </Card>
+          }
+        />
+        <LatestBlockCard
+          id="re-card"
+          label="Real Estate Wallet"
+          value={totalTokenValue}
+          subtitle={`Across ${tokenizedProperties.length} properties`}
+          locale={locale}
+          gradientClassName="bg-gradient-to-br from-rose-500 to-orange-500"
+          icon={Building2}
+        />
       </div>
 
-      <Card className="p-6">
-        <div className="flex items-center justify-between mb-6">
-          <h3 className="text-lg font-semibold">Wallet Address</h3>
-          <div className="flex gap-2">
-            <Button variant="outline" size="icon" onClick={handleCopyAddress}>
-              <Copy className="h-4 w-4" />
-            </Button>
-            <Button variant="outline" size="icon">
-              <QrCode className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-        <div className="flex items-center gap-2 p-4 bg-secondary/50 rounded-lg">
-          <code className="text-sm flex-1">{walletAddress}</code>
-          <Badge variant="secondary">MNR Network</Badge>
-        </div>
-      </Card>
-
-      <Card>
-        <Tabs defaultValue="tokens" className="custom-tabs">
-          <div className="flex items-center justify-between p-6 border-b">
-            <h3 className="text-lg font-semibold">Assets & History</h3>
-            <TabsList>
-              <TabsTrigger value="tokens">
-                <Building2 className="h-4 w-4 mr-2" />
-                <span>Real Estate Tokens</span>
-              </TabsTrigger>
-              <TabsTrigger value="all">
-                <Clock className="h-4 w-4 mr-2" />
-                <span>Transaction History</span>
-              </TabsTrigger>
-            </TabsList>
-          </div>
-
-          <TabsContent value="tokens" className="p-6">
+      {/* Mobile-only: conditional content shown under active card */}
+      <div className="sm:hidden">
+        {activeCard === 0 && (
+          <FiatTransactionsTable />
+        )}
+        {activeCard === 1 && (
+          <ManoraTransactionsTable />
+        )}
+        {activeCard === 2 && (
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-6">Real Estate Tokens</h3>
+            <div className="space-y-6">
+              {tokenizedProperties.map((property) => (
+                <div
+                  onClick={() => router.push(`/dashboard/investments/${property.id}`)}
+                  key={property.id}
+                  className="flex flex-col gap-6 p-4 rounded-lg border bg-card/50 hover:bg-secondary/40 transition-colors cursor-pointer"
+                >
+                  <div className="relative w-full h-32 rounded-lg overflow-hidden">
+                    <Image
+                      src={property.image}
+                      alt={property.name}
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="100vw"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <div className="font-semibold">{property.name}</div>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div><span className="text-muted-foreground">Symbol</span><div>{property.tokenSymbol}</div></div>
+                      <div><span className="text-muted-foreground">Owned</span><div>{property.ownedTokens} / {property.totalTokens}</div></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Card>
+        )}
+      </div>
+      <div className="hidden sm:grid gap-6 md:grid-cols-4">
+        <div className="md:col-span-3">
+          <Card className="p-6">
+            <h3 className="text-lg font-semibold mb-6">Real Estate Tokens</h3>
             <div className="space-y-6">
               {tokenizedProperties.map((property) => (
                 <div
@@ -288,10 +320,13 @@ export default function WalletPage() {
                   className="flex flex-col md:flex-row gap-6 p-4 rounded-lg border bg-card/50 hover:bg-secondary/40 transition-colors cursor-pointer"
                 >
                   <div className="relative w-full md:w-48 h-32 rounded-lg overflow-hidden">
-                    <img
+                    <Image
                       src={property.image}
                       alt={property.name}
-                      className="object-cover w-full h-full"
+                      fill
+                      unoptimized
+                      className="object-cover"
+                      sizes="(min-width: 768px) 12rem, 100vw"
                     />
                   </div>
                   <div className="flex-1 space-y-4">
@@ -320,7 +355,7 @@ export default function WalletPage() {
                       </div>
                       <div>
                         <p className="text-sm text-muted-foreground">Total Value</p>
-                        <p className="font-semibold">${(property.ownedTokens * property.tokenPrice).toLocaleString()}</p>
+                        <p className="font-semibold">${(property.ownedTokens * property.tokenPrice).toLocaleString(locale === 'ar' ? 'ar' : 'en-US')}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
@@ -337,396 +372,128 @@ export default function WalletPage() {
                 </div>
               ))}
             </div>
-          </TabsContent>
-
-          <TabsContent value="all" className="p-6">
+          </Card>
+        </div>
+        <div className="md:col-span-1">
+          <Card className="p-6 hidden sm:block">
             <div className="space-y-4">
-              {transactions.map((transaction) => (
-                <div
-                  key={transaction.id}
-                  className="flex items-center justify-between p-4 rounded-lg border bg-card/50"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className={`p-2 rounded-full ${
-                      transaction.type === "receive" 
-                        ? "bg-green-500/10 text-green-500" 
-                        : "bg-blue-500/10 text-blue-500"
-                    }`}>
-                      {transaction.type === "receive" ? (
-                        <ArrowDownLeft className="h-5 w-5" />
-                      ) : (
-                        <ArrowUpRight className="h-5 w-5" />
-                      )}
-                    </div>
-                    <div>
-                      <p className="font-medium">
-                        {transaction.type === "receive" ? "Received" : "Sent"} {transaction.cryptoAmount} {transaction.cryptoCurrency}
-                      </p>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        {new Date(transaction.date).toLocaleDateString()}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">
-                      {transaction.type === "receive" ? "+" : "-"} ${transaction.amount.toFixed(2)}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {transaction.type === "receive" ? "From: " : "To: "}
-                      {transaction.type === "receive" ? transaction.from : transaction.to}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </TabsContent>
-        </Tabs>
-      </Card>
-
-      {/* Deposit Dialog */}
-      <Dialog open={showDepositDialog} onOpenChange={setShowDepositDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Deposit Funds</DialogTitle>
-            <DialogDescription>
-              Choose how you would like to deposit funds to your wallet.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-4">
-            <div className="space-y-4">
-              <Select value={depositCurrency} onValueChange={setDepositCurrency}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select currency" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="usd">USD</SelectItem>
-                  <SelectItem value="mnr">MNR</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Input
-                type="number"
-                placeholder="Enter amount"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(e.target.value)}
-                className="col-span-2"
-              />
-
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Minimum deposit amount: $100 or 40 MNR
-                </AlertDescription>
-              </Alert>
-            </div>
-          </div>
-          <div className="flex justify-between">
-            <Button variant="outline" onClick={() => setShowDepositDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleContinueToPayment}>
-              Continue to Payment
-              <ExternalLink className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Payment Dialog */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>Payment Details</DialogTitle>
-            <DialogDescription>
-              Select your preferred payment method and enter your details.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div>
-              <h4 className="text-sm font-medium mb-3">Amount to Deposit</h4>
-              <div className="flex items-center justify-between p-4 bg-secondary/50 rounded-lg">
-                <span className="text-sm text-muted-foreground">Total Amount</span>
-                <span className="text-lg font-semibold">
-                  {depositCurrency === "usd" ? "$" : ""}{depositAmount} {depositCurrency?.toUpperCase()}
-                </span>
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Wallet Access</h3>
               </div>
-            </div>
-
-            <div className="space-y-4">
-              <h4 className="text-sm font-medium">Payment Method</h4>
-              <RadioGroup
-                value={paymentMethod}
-                onValueChange={setPaymentMethod}
-                className="grid grid-cols-3 gap-4"
-              >
-                <Label
-                  htmlFor="credit-card"
-                  className={`flex flex-col items-center justify-center rounded-lg border-2 p-4 cursor-pointer hover:bg-secondary/50 ${
-                    paymentMethod === "credit-card" ? "border-primary" : "border-transparent"
-                  }`}
-                >
-                  <RadioGroupItem value="credit-card" id="credit-card" className="sr-only" />
-                  <CreditCard className="h-6 w-6 mb-2" />
-                  <span className="text-sm">Credit Card</span>
-                </Label>
-                <Label
-                  htmlFor="bank-transfer"
-                  className={`flex flex-col items-center justify-center rounded-lg border-2 p-4 cursor-pointer hover:bg-secondary/50 ${
-                    paymentMethod === "bank-transfer" ? "border-primary" : "border-transparent"
-                  }`}
-                >
-                  <RadioGroupItem value="bank-transfer" id="bank-transfer" className="sr-only" />
-                  <Building className="h-6 w-6 mb-2" />
-                  <span className="text-sm">Bank Transfer</span>
-                </Label>
-                <Label
-                  htmlFor="wire-transfer"
-                  className={`flex flex-col items-center justify-center rounded-lg border-2 p-4 cursor-pointer hover:bg-secondary/50 ${
-                    paymentMethod === "wire-transfer" ? "border-primary" : "border-transparent"
-                  }`}
-                >
-                  <RadioGroupItem value="wire-transfer" id="wire-transfer" className="sr-only" />
-                  <Landmark className="h-6 w-6 mb-2" />
-                  <span className="text-sm">Wire Transfer</span>
-                </Label>
-              </RadioGroup>
-            </div>
-
-            {paymentMethod === "credit-card" && (
-              <div className="space-y-4">
-                <Input placeholder="Card Number" />
-                <div className="grid grid-cols-2 gap-4">
-                  <Input placeholder="MM/YY" />
-                  <Input placeholder="CVC" />
-                </div>
-                <Input placeholder="Cardholder Name" />
-              </div>
-            )}
-
-            {paymentMethod === "bank-transfer" && (
-              <div className="space-y-4">
-                <Input placeholder="Account Number" />
-                <Input placeholder="Routing Number" />
-                <Input placeholder="Account Holder Name" />
-              </div>
-            )}
-
-            {paymentMethod === "wire-transfer" && (
-              <div className="space-y-4">
-                <Input placeholder="SWIFT/BIC Code" />
-                <Input placeholder="IBAN" />
-                <Input placeholder="Bank Name" />
-                <Input placeholder="Account Holder Name" />
-              </div>
-            )}
-
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Your payment information is encrypted and secure. We never store your full payment details.
-              </AlertDescription>
-            </Alert>
-          </div>
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={() => {
-              setShowPaymentDialog(false)
-              setShowDepositDialog(true)
-            }}>
-              Back
-            </Button>
-            <Button onClick={handlePaymentSubmit}>
-              Complete Payment
-              <ArrowUpRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      {/* Withdraw Dialog */}
-      <Dialog open={showWithdrawDialog} onOpenChange={setShowWithdrawDialog}>
-        <DialogContent className="sm:max-w-[525px]">
-          <DialogHeader>
-            <DialogTitle>Withdraw Funds</DialogTitle>
-            <DialogDescription>
-              Enter the amount and destination for your withdrawal.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Currency</Label>
-                  <Select value={withdrawCurrency} onValueChange={setWithdrawCurrency}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select currency" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="usd">USD</SelectItem>
-                      <SelectItem value="mnr">MNR</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>Amount</Label>
-                  <Input
-                    type="number"
-                    placeholder="Enter amount"
-                    value={withdrawAmount}
-                    onChange={(e) => setWithdrawAmount(e.target.value)}
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
-                <Label>Withdrawal Method</Label>
-                <RadioGroup
-                  value={withdrawMethod}
-                  onValueChange={setWithdrawMethod}
-                  className="grid grid-cols-2 gap-4"
-                >
-                  <Label
-                    htmlFor="bank"
-                    className={`flex items-center justify-center rounded-lg border-2 p-4 cursor-pointer hover:bg-secondary/50 ${
-                      withdrawMethod === "bank" ? "border-primary" : "border-transparent"
-                    }`}
-                  >
-                    <RadioGroupItem value="bank" id="bank" className="sr-only" />
-                    <Building className="h-6 w-6 mr-2" />
-                    <span>Bank Account</span>
-                  </Label>
-                  <Label
-                    htmlFor="crypto"
-                    className={`flex items-center justify-center rounded-lg border-2 p-4 cursor-pointer hover:bg-secondary/50 ${
-                      withdrawMethod === "crypto" ? "border-primary" : "border-transparent"
-                    }`}
-                  >
-                    <RadioGroupItem value="crypto" id="crypto" className="sr-only" />
-                    <Wallet className="h-6 w-6 mr-2" />
-                    <span>Crypto Wallet</span>
-                  </Label>
-                </RadioGroup>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Wallet URL</span>
+                  <Button variant="outline" size="sm" className="h-8" onClick={handleCopyUrl}>
+                    <Copy className="h-4 w-4 mr-2" />
+                    Copy
+                  </Button>
+                </div>
+                <div className="p-3 rounded-lg bg-secondary/50 border">
+                  <p className="text-sm break-all">{walletUrl}</p>
+                </div>
               </div>
-
-              {withdrawMethod === "bank" && (
-                <div className="space-y-4">
-                  <Input placeholder="Bank Account Number" />
-                  <Input placeholder="Routing Number" />
-                  <Input placeholder="Account Holder Name" />
-                  <Input placeholder="Bank Name" />
+              <div className="flex flex-col items-center">
+                <div className="p-3 rounded-lg border bg-background">
+                  <QRCode value={walletUrl} size={180} style={{ height: "auto", maxWidth: "100%", width: "180px" }} />
                 </div>
-              )}
-
-              {withdrawMethod === "crypto" && (
-                <div className="space-y-4">
-                  <Input 
-                    placeholder="Wallet Address" 
-                    value={withdrawDestination}
-                    onChange={(e) => setWithdrawDestination(e.target.value)}
-                  />
-                  <Alert>
-                    <Info className="h-4 w-4" />
-                    <AlertDescription>
-                      Make sure to enter the correct wallet address. Transactions cannot be reversed.
-                    </AlertDescription>
-                  </Alert>
-                </div>
-              )}
-
-              <div className="rounded-lg border p-4 space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span>{withdrawCurrency === "usd" ? "$" : ""}{withdrawAmount || "0"} {withdrawCurrency?.toUpperCase()}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">Fee</span>
-                  <span>{withdrawCurrency === "usd" ? "$" : ""}{withdrawFee} {withdrawCurrency?.toUpperCase()}</span>
-                </div>
-                <div className="pt-2 border-t">
-                  <div className="flex justify-between font-medium">
-                    <span>You will receive</span>
-                    <span>{withdrawCurrency === "usd" ? "$" : ""}{totalWithdraw} {withdrawCurrency?.toUpperCase()}</span>
-                  </div>
-                </div>
+                <p className="text-xs text-muted-foreground mt-2">QR Code for quick wallet access</p>
               </div>
             </div>
-          </div>
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={() => setShowWithdrawDialog(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleWithdrawSubmit}>
-              Continue
-              <ArrowUpRight className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
+          </Card>
+        </div>
+      </div>
 
-      {/* Withdraw Confirmation Dialog */}
-      <Dialog open={showWithdrawConfirmDialog} onOpenChange={setShowWithdrawConfirmDialog}>
-        <DialogContent className="sm:max-w-[425px]">
-          <DialogHeader>
-            <DialogTitle>Confirm Withdrawal</DialogTitle>
-            <DialogDescription>
-              Please review the withdrawal details below.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-6">
-            <div className="rounded-lg border p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount</span>
-                  <span className="font-medium">
-                    {withdrawCurrency === "usd" ? "$" : ""}{withdrawAmount} {withdrawCurrency?.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Fee</span>
-                  <span className="font-medium">
-                    {withdrawCurrency === "usd" ? "$" : ""}{withdrawFee} {withdrawCurrency?.toUpperCase()}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">You will receive</span>
-                  <span className="font-medium">
-                    {withdrawCurrency === "usd" ? "$" : ""}{totalWithdraw} {withdrawCurrency?.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-              <div className="pt-4 border-t">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Destination</span>
-                  <span className="font-medium">
-                    {withdrawMethod === "crypto" 
-                      ? `${withdrawDestination.slice(0, 6)}...${withdrawDestination.slice(-4)}`
-                      : "Bank Account"}
-                  </span>
-                </div>
-              </div>
+      <DepositPanel
+        open={showDepositDialog}
+        onOpenChange={(open) => { setShowDepositDialog(open); if (!open) setDepositFiatOnly(false) }}
+        depositFiatOnly={depositFiatOnly}
+        depositCurrency={depositCurrency}
+        depositAmount={depositAmount}
+        setDepositCurrency={setDepositCurrency}
+        setDepositAmount={setDepositAmount}
+        onContinueToPayment={handleContinueToPayment}
+      />
+
+      <PaymentPanel
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+        depositCurrency={depositCurrency}
+        depositAmount={depositAmount}
+        paymentMethod={paymentMethod}
+        setPaymentMethod={setPaymentMethod}
+        onBack={() => { setShowPaymentDialog(false); setShowDepositDialog(true) }}
+        onSubmit={handlePaymentSubmit}
+      />
+
+      <WithdrawPanel
+        open={showWithdrawDialog}
+        onOpenChange={(open) => { setShowWithdrawDialog(open); if (!open) setWithdrawFiatOnly(false) }}
+        withdrawFiatOnly={withdrawFiatOnly}
+        withdrawCurrency={withdrawCurrency}
+        setWithdrawCurrency={setWithdrawCurrency}
+        withdrawAmount={withdrawAmount}
+        setWithdrawAmount={setWithdrawAmount}
+        withdrawMethod={withdrawMethod}
+        setWithdrawMethod={setWithdrawMethod}
+        withdrawDestination={withdrawDestination}
+        setWithdrawDestination={setWithdrawDestination}
+        withdrawFee={withdrawFee}
+        totalWithdraw={totalWithdraw}
+        onContinue={handleWithdrawSubmit}
+      />
+
+      <WithdrawConfirmPanel
+        open={showWithdrawConfirmDialog}
+        onOpenChange={setShowWithdrawConfirmDialog}
+        withdrawCurrency={withdrawCurrency}
+        withdrawAmount={withdrawAmount}
+        withdrawFee={withdrawFee}
+        totalWithdraw={totalWithdraw}
+        withdrawMethod={withdrawMethod}
+        withdrawDestination={withdrawDestination}
+        onBack={() => { setShowWithdrawConfirmDialog(false); setShowWithdrawDialog(true) }}
+        onConfirm={handleWithdrawConfirm}
+      />
+
+      {showTradeMnr && (
+        <TradeMnrPanel
+          open={!!showTradeMnr}
+          onOpenChange={(o)=>{ if(!o){ setShowTradeMnr(null); setTradeMnrAmount("") } }}
+          mode={showTradeMnr.mode}
+          mnrAmount={tradeMnrAmount}
+          setMnrAmount={setTradeMnrAmount}
+          rateUsdPerMnr={rateUsdPerMnr}
+          onConfirm={()=>{ setShowTradeMnr(null); setTradeMnrAmount("") }}
+        />
+      )}
+
+      {/* Wallet QR - visible via dialog only on mobile */}
+      <BottomSheet open={showQrDialog} onOpenChange={setShowQrDialog} title="Wallet QR">
+        <div className="space-y-4">
+          <div className="flex items-center gap-2">
+            <QrCode className="h-5 w-5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">Scan to access wallet</span>
+          </div>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Wallet URL</span>
+              <Button variant="outline" size="sm" className="h-8" onClick={handleCopyUrl}>
+                <Copy className="h-4 w-4 mr-2" />
+                Copy
+              </Button>
             </div>
+            <div className="p-3 rounded-lg bg-secondary/50 border">
+              <p className="text-sm break-all">{walletUrl}</p>
+            </div>
+          </div>
+          <div className="flex justify-center">
+            <div className="p-3 rounded-lg border bg-background">
+              <QRCode value={walletUrl} size={200} style={{ height: "auto", maxWidth: "100%", width: "200px" }} />
+            </div>
+          </div>
+        </div>
+      </BottomSheet>
 
-            <Alert>
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                This action cannot be undone. Please make sure all details are correct.
-              </AlertDescription>
-            </Alert>
-          </div>
-          <div className="flex justify-between mt-6">
-            <Button variant="outline" onClick={() => {
-              setShowWithdrawConfirmDialog(false)
-              setShowWithdrawDialog(true)
-            }}>
-              Back
-            </Button>
-            <Button onClick={handleWithdrawConfirm}>
-              Confirm Withdrawal
-              <CheckCircle2 className="ml-2 h-4 w-4" />
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }
