@@ -25,6 +25,7 @@ const mnrTransactions: MnrTx[] = [
 export default function ManoraTransactionsTable() {
   const [page, setPage] = React.useState<number>(1)
   const [pageSize, setPageSize] = React.useState<number>(10)
+  const [showBar, setShowBar] = React.useState<boolean>(true)
 
   const totalItems = mnrTransactions.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
@@ -34,6 +35,20 @@ export default function ManoraTransactionsTable() {
   const paginated = React.useMemo(() => mnrTransactions.slice(startIdx, endIdx), [startIdx, endIdx])
 
   const dateFmt = React.useMemo(() => new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'UTC' }), [])
+
+  React.useEffect(() => {
+    const scroller = document.querySelector('main') as HTMLElement | null
+    if (!scroller) return
+    let last = scroller.scrollTop
+    const onScroll = () => {
+      const y = scroller.scrollTop
+      if (y > last && y > 80) setShowBar(false)
+      else setShowBar(true)
+      last = y
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    return () => scroller.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <>
@@ -66,15 +81,15 @@ export default function ManoraTransactionsTable() {
             <div className="text-sm text-muted-foreground">No MNR transactions.</div>
           )}
         </div>
-        <div className="flex items-center justify-between gap-3 pt-4 flex-wrap">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <div className={`flex items-center justify-between gap-2 pt-2 sm:pt-3 sm:flex-wrap whitespace-nowrap fixed inset-x-0 bottom-20 z-30 border-t bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 px-3 sm:px-0 sm:static transform transition-transform duration-200 ${showBar ? 'translate-y-0' : 'translate-y-full'} sm:translate-y-0`}>
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
             <Select value={String(pageSize)} onValueChange={(v)=>setPageSize(Number(v))}>
-              <SelectTrigger className="w-[90px]"><SelectValue /></SelectTrigger>
+              <SelectTrigger className="w-[72px] h-9"><SelectValue /></SelectTrigger>
               <SelectContent>{[5,10,20,50].map(n => (<SelectItem key={n} value={String(n)}>{n}</SelectItem>))}</SelectContent>
             </Select>
-            <span>{totalItems === 0 ? '0-0' : `${startIdx + 1}-${endIdx}`} of {totalItems}</span>
+            <span className="hidden sm:inline">{totalItems === 0 ? '0-0' : `${startIdx + 1}-${endIdx}`} of {totalItems}</span>
           </div>
-          <Pagination className="w-auto ml-auto">
+          <Pagination className="w-auto ml-auto shrink-0">
             <PaginationContent>
               <PaginationItem><PaginationFirst href="#" onClick={(e)=>{e.preventDefault(); setPage(1)}} /></PaginationItem>
               <PaginationItem><PaginationPrevious href="#" onClick={(e)=>{e.preventDefault(); setPage(p=>Math.max(1,p-1))}} /></PaginationItem>
@@ -88,6 +103,7 @@ export default function ManoraTransactionsTable() {
             </PaginationContent>
           </Pagination>
         </div>
+        <div className="h-28 sm:hidden" />
       </div>
 
       {/* Desktop: keep Card wrapper as-is */}

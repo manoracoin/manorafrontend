@@ -4,7 +4,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpRight, ArrowDownLeft, Copy, Percent, DollarSign, Coins, Building2, QrCode } from "lucide-react"
+import { ArrowUpRight, ArrowDownLeft, Copy, Percent, DollarSign, Coins, Building2, QrCode, Camera } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -19,6 +19,7 @@ import WithdrawConfirmPanel from "@/components/wallet/WithdrawConfirmPanel"
 import BottomSheet from "@/components/ui/BottomSheet"
 import FiatTransactionsTable from "@/components/wallet/FiatTransactionsTable"
 import ManoraTransactionsTable from "@/components/wallet/ManoraTransactionsTable"
+import CameraScanner from "@/components/common/CameraScanner"
 
 // Move data outside component to prevent recreation on each render
 const tokenizedProperties = [
@@ -121,6 +122,7 @@ export default function WalletPage() {
   const [tradeMnrAmount, setTradeMnrAmount] = useState("")
   const rateUsdPerMnr = 2.5
   const [showQrDialog, setShowQrDialog] = useState(false)
+  const [showScanner, setShowScanner] = useState(false)
 
   // Memoized calculations
   const totalTokenValue = useMemo(() => {
@@ -206,9 +208,14 @@ export default function WalletPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-3xl font-bold tracking-tight">Wallet</h2>
-        <Button variant="ghost" size="icon" className="inline-flex sm:hidden text-muted-foreground hover:text-foreground" aria-label="Show Wallet QR" onClick={() => setShowQrDialog(true)}>
-          <QrCode className="h-5 w-5" />
-        </Button>
+        <div className="inline-flex sm:hidden items-center gap-1">
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" aria-label="Open Camera Scanner" onClick={() => setShowScanner(true)}>
+            <Camera className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground" aria-label="Show Wallet QR" onClick={() => setShowQrDialog(true)}>
+            <QrCode className="h-5 w-5" />
+          </Button>
+        </div>
       </div>
 
       <div ref={scrollerRef} className="flex gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:grid sm:gap-4 sm:grid-cols-3 sm:overflow-x-hidden sm:snap-none">
@@ -276,14 +283,14 @@ export default function WalletPage() {
           <ManoraTransactionsTable />
         )}
         {activeCard === 2 && (
-          <Card className="p-6">
-            <h3 className="text-lg font-semibold mb-6">Real Estate Tokens</h3>
-            <div className="space-y-6">
+          <div className="-mx-4">
+            <h3 className="text-lg font-semibold mb-3 px-4">Real Estate Tokens</h3>
+            <div className="space-y-2">
               {tokenizedProperties.map((property) => (
                 <div
                   onClick={() => router.push(`/dashboard/investments/${property.id}`)}
                   key={property.id}
-                  className="flex flex-col gap-6 p-4 rounded-lg border bg-card/50 hover:bg-secondary/40 transition-colors cursor-pointer"
+                  className="flex flex-col gap-6 p-4 border-t bg-card/50 hover:bg-secondary/40 transition-colors cursor-pointer first:border-t-0"
                 >
                   <div className="relative w-full h-32 rounded-lg overflow-hidden">
                     <Image
@@ -305,7 +312,7 @@ export default function WalletPage() {
                 </div>
               ))}
             </div>
-          </Card>
+          </div>
         )}
       </div>
       <div className="hidden sm:grid gap-6 md:grid-cols-4">
@@ -493,6 +500,9 @@ export default function WalletPage() {
           </div>
         </div>
       </BottomSheet>
+
+      {/* Camera Scanner (mobile) */}
+      <CameraScanner open={showScanner} onOpenChange={setShowScanner} title="Scan" onResult={(text)=>{ console.log('Scanned:', text) }} />
 
     </div>
   )

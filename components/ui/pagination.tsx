@@ -20,7 +20,7 @@ const PaginationContent = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <ul
     ref={ref}
-    className={cn('flex flex-row items-center gap-1', className)}
+    className={cn('flex flex-row items-center gap-0.5 sm:gap-1', className)}
     {...props}
   />
 ));
@@ -66,8 +66,8 @@ const PaginationPrevious = ({
 }: React.ComponentProps<typeof PaginationLink>) => (
   <PaginationLink
     aria-label="Go to previous page"
-    size="default"
-    className={cn('gap-1 pl-2.5', className)}
+    size="icon"
+    className={cn('', className)}
     {...props}
   >
     <ChevronLeft className="h-4 w-4" />
@@ -87,8 +87,8 @@ const PaginationNext = ({
 }: React.ComponentProps<typeof PaginationLink>) => (
   <PaginationLink
     aria-label="Go to next page"
-    size="default"
-    className={cn('gap-1 pr-2.5', className)}
+    size="icon"
+    className={cn('', className)}
     {...props}
   >
     {children ? (
@@ -129,7 +129,7 @@ export {
 // Additional helpers (double arrows)
 type IconLinkProps = Pick<ButtonProps, 'size'> & React.ComponentProps<'a'>;
 
-const baseIconClasses = 'inline-flex items-center justify-center h-10 w-10';
+const baseIconClasses = 'inline-flex items-center justify-center h-9 w-9 sm:h-10 sm:w-10';
 
 export const PaginationFirst = ({ className, ...props }: IconLinkProps) => (
   <a aria-label="Go to first page" className={cn(buttonVariants({ variant: 'ghost', size: 'icon' }), baseIconClasses, className)} {...props}>
