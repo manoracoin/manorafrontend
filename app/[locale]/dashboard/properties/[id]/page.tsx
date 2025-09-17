@@ -7,7 +7,7 @@ export default async function Page({
   params: Promise<{ locale: string; id: string }>
 }) {
   const { id } = await params;
-  return <BasePage params={{ id }} />;
+  return <BasePage params={Promise.resolve({ id })} />;
 }
 
 // Expand the base page's params with locale prefixes so Next can statically build them
