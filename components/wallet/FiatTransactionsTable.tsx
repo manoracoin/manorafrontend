@@ -9,18 +9,45 @@ import { Pagination, PaginationContent, PaginationFirst, PaginationItem, Paginat
 
 import { fiatTransactions } from "@/components/wallet/fiatData"
 
-export default function FiatTransactionsTable() {
+export default function FiatTransactionsTable({
+  showTitle = true,
+  types,
+  sortBy,
+}: {
+  showTitle?: boolean
+  types?: Array<'deposit'|'withdraw'|'buy'|'sell'>
+  sortBy?: string
+}) {
   const [page, setPage] = React.useState<number>(1)
   const [pageSize, setPageSize] = React.useState<number>(10)
   const [showBar, setShowBar] = React.useState<boolean>(true)
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
 
-  const totalItems = fiatTransactions.length
+  const filtered = React.useMemo(() => {
+    if (!types || types.length === 0) return fiatTransactions
+    return fiatTransactions.filter(tx => (types as any).includes(tx.type))
+  }, [types])
+
+  const sorted = React.useMemo(() => {
+    const arr = [...filtered]
+    switch (sortBy) {
+      case 'Oldest First':
+        return arr.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      case 'Value: High to Low':
+        return arr.sort((a, b) => b.amount - a.amount)
+      case 'Value: Low to High':
+        return arr.sort((a, b) => a.amount - b.amount)
+      default:
+        return arr.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    }
+  }, [filtered, sortBy])
+
+  const totalItems = sorted.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const currentPage = Math.min(page, totalPages)
   const startIdx = (currentPage - 1) * pageSize
   const endIdx = Math.min(currentPage * pageSize, totalItems)
-  const paginated = React.useMemo(() => fiatTransactions.slice(startIdx, endIdx), [startIdx, endIdx])
+  const paginated = React.useMemo(() => sorted.slice(startIdx, endIdx), [sorted, startIdx, endIdx])
 
   const dateFmt = React.useMemo(() => new Intl.DateTimeFormat('en-US', { dateStyle: 'short', timeStyle: 'short', timeZone: 'UTC' }), [])
   const timeFmt = React.useMemo(() => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }), [])
@@ -71,7 +98,7 @@ export default function FiatTransactionsTable() {
     <>
       {/* Mobile: full-width rows without Card wrapper, with row numbers + pagination */}
       <div className="sm:hidden">
-        <h3 className="text-lg font-semibold mb-3">Fiat Transactions</h3>
+        {showTitle && (<h3 className="text-lg font-semibold mb-3">Fiat Transactions</h3>)}
         <div className="space-y-2">
           {groups.map((group) => (
             <div key={group.label} className="space-y-2">
@@ -82,7 +109,7 @@ export default function FiatTransactionsTable() {
                 </span>
               </div>
               {group.items.map((tx) => (
-                <div key={tx.id} className="p-3 rounded-lg border bg-card/50">
+                <div key={tx.id} className="p-3 rounded-lg bg-card/50">
                   <div className="sm:hidden cursor-pointer" onClick={() => toggleExpand(tx.id)}>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -188,9 +215,9 @@ export default function FiatTransactionsTable() {
 
       {/* Desktop: keep Card wrapper as-is */}
       <Card className="hidden sm:block p-6">
-        <h3 className="text-lg font-semibold mb-3">Fiat Transactions</h3>
+        {showTitle && (<h3 className="text-lg font-semibold mb-3">Fiat Transactions</h3>)}
         <div className="space-y-2">
-          {fiatTransactions.map(tx => (
+          {sorted.map(tx => (
             <div key={tx.id} className="p-3 rounded-lg border bg-card/50">
               <div className="flex items-center gap-2">
                 {/* Type icon - first column */}
@@ -214,7 +241,7 @@ export default function FiatTransactionsTable() {
               <div className="mt-1 text-sm font-medium">${tx.amount.toLocaleString()}</div>
             </div>
           ))}
-          {fiatTransactions.length === 0 && (
+          {sorted.length === 0 && (
             <div className="text-sm text-muted-foreground">No fiat transactions.</div>
           )}
         </div>

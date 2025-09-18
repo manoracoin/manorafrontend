@@ -14,7 +14,9 @@ import { SORT_OPTIONS } from "@/components/explorer/constants"
 import BottomSheet from "@/components/ui/BottomSheet"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Calendar } from "@/components/ui/calendar"
 import { Checkbox } from "@/components/ui/checkbox"
+import FiatTransactionsList from "@/components/wallet/FiatTransactionsList"
 
 import { fiatTransactions } from "@/components/wallet/fiatData"
 
@@ -29,6 +31,10 @@ export default function FiatTransactionsPage() {
   const [sortBy, setSortBy] = React.useState<string>(SORT_OPTIONS[0])
   const [isDesktop, setIsDesktop] = React.useState<boolean>(false)
   const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
+  const [dateFrom, setDateFrom] = React.useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = React.useState<Date | undefined>(undefined)
+  const [showFromCal, setShowFromCal] = React.useState<boolean>(false)
+  const [showToCal, setShowToCal] = React.useState<boolean>(false)
 
   React.useEffect(() => {
     const mql = window.matchMedia('(min-width: 640px)')
@@ -39,10 +45,14 @@ export default function FiatTransactionsPage() {
   }, [])
 
   const filtered = React.useMemo(() => {
-    return fiatTransactions.filter(tx =>
-      (types.length === 0 ? true : types.includes(tx.type as any))
-    )
-  }, [types])
+    return fiatTransactions.filter(tx => {
+      if (types.length > 0 && !types.includes(tx.type as any)) return false
+      const ts = new Date(tx.timestamp)
+      if (dateFrom && ts < new Date(dateFrom.getFullYear(), dateFrom.getMonth(), dateFrom.getDate())) return false
+      if (dateTo && ts > new Date(dateTo.getFullYear(), dateTo.getMonth(), dateTo.getDate(), 23, 59, 59, 999)) return false
+      return true
+    })
+  }, [types, dateFrom, dateTo])
 
   const toggleType = (value: 'deposit'|'withdraw'|'buy'|'sell') => {
     setTypes(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value])
@@ -135,7 +145,12 @@ export default function FiatTransactionsPage() {
       </div>
 
       <Card className="p-0 sm:p-6 border-0 rounded-none bg-transparent sm:border sm:rounded-lg sm:bg-card">
-        <div className="space-y-3">
+        {/* Mobile list extracted */}
+        <div className="sm:hidden">
+          <FiatTransactionsList transactions={paginated} />
+        </div>
+        {/* Desktop table unchanged */}
+        <div className="hidden sm:block space-y-3">
           {groups.map((group) => (
             <div key={group.label} className="space-y-2">
               <div className="flex items-center gap-2 px-3 py-1 text-xs uppercase text-muted-foreground">
@@ -146,7 +161,7 @@ export default function FiatTransactionsPage() {
               </div>
               {group.items.map((tx) => (
                 <div key={tx.id} className="p-3 rounded-lg border bg-card/50">
-                  <div className="hidden sm:grid items-center grid-cols-[0.5fr_1.2fr_1fr_1fr_1fr_0.7fr] gap-2">
+                  <div className="grid items-center grid-cols-[0.5fr_1.2fr_1fr_1fr_1fr_0.7fr] gap-2">
                     {tx.type==='buy' || tx.type==='sell' ? (
                       <div className="flex items-center gap-1">
                         {tx.type==='sell' ? (
@@ -320,17 +335,61 @@ export default function FiatTransactionsPage() {
               <SheetTitle>Filters</SheetTitle>
             </SheetHeader>
             <div className="min-h-0 overflow-y-auto px-4 pb-4">
-              <div className="space-y-3">
+              <div className="space-y-5">
                 <div>
                   <div className="text-xs mb-1 text-muted-foreground">Type</div>
-                  <div className="space-y-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {(['deposit','withdraw','buy','sell'] as const).map(opt => (
-                      <label key={opt} className="flex items-center gap-3">
-                        <Checkbox checked={types.includes(opt)} onCheckedChange={() => toggleType(opt)} />
-                        <span className="text-sm capitalize">{opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}</span>
-                      </label>
+                      <button
+                        key={opt}
+                        className={`text-sm px-3 py-2 rounded-lg border ${types.includes(opt) ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+                        onClick={() => toggleType(opt)}
+                      >
+                        {opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}
+                      </button>
                     ))}
                   </div>
+                </div>
+                <div>
+                  <div className="text-xs mb-1 text-muted-foreground">Date range</div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">From</div>
+                      <button className="w-full text-left px-3 py-2 rounded-lg border bg-card border-border/50" onClick={() => { setShowFromCal(v=>!v); setShowToCal(false) }}>
+                        {dateFrom ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateFrom) : 'Select date'}
+                      </button>
+                      {showFromCal && (
+                        <div className="mt-2 inline-block rounded-lg border p-2 bg-card overflow-hidden">
+                          <Calendar
+                            mode="single"
+                            selected={dateFrom}
+                            onSelect={(d:any) => { if (!d) return; if (dateTo && d > dateTo) setDateTo(d); setDateFrom(d); setShowFromCal(false) }}
+                            numberOfMonths={1}
+                          />
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-xs text-muted-foreground mb-1">To</div>
+                      <button className="w-full text-left px-3 py-2 rounded-lg border bg-card border-border/50" onClick={() => { setShowToCal(v=>!v); setShowFromCal(false) }}>
+                        {dateTo ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateTo) : 'Select date'}
+                      </button>
+                      {showToCal && (
+                        <div className="mt-2 inline-block rounded-lg border p-2 bg-card overflow-hidden">
+                          <Calendar
+                            mode="single"
+                            selected={dateTo}
+                            onSelect={(d:any) => { if (!d) return; if (dateFrom && d < dateFrom) setDateFrom(d); setDateTo(d); setShowToCal(false) }}
+                            numberOfMonths={1}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-1">
+                  <Button variant="destructive" onClick={() => { setTypes([]); setDateFrom(undefined); setDateTo(undefined); }}>Reset</Button>
+                  <Button onClick={() => setIsFiltersOpen(false)}>Apply</Button>
                 </div>
               </div>
             </div>
@@ -338,17 +397,61 @@ export default function FiatTransactionsPage() {
         </Sheet>
       ) : (
         <BottomSheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen} title="Filters">
-          <div className="space-y-3">
+          <div className="space-y-5">
             <div>
               <div className="text-xs mb-1 text-muted-foreground">Type</div>
-              <div className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
                 {(['deposit','withdraw','buy','sell'] as const).map(opt => (
-                  <label key={opt} className="flex items-center gap-3">
-                    <Checkbox checked={types.includes(opt)} onCheckedChange={() => toggleType(opt)} />
-                    <span className="text-sm capitalize">{opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}</span>
-                  </label>
+                  <button
+                    key={opt}
+                    className={`text-sm px-3 py-2 rounded-lg border ${types.includes(opt) ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+                    onClick={() => toggleType(opt)}
+                  >
+                    {opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}
+                  </button>
                 ))}
               </div>
+            </div>
+            <div>
+              <div className="text-xs mb-1 text-muted-foreground">Date range</div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">From</div>
+                  <button className="w-full text-left px-3 py-2 rounded-lg border bg-card border-border/50" onClick={() => { setShowFromCal(v=>!v); setShowToCal(false) }}>
+                    {dateFrom ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateFrom) : 'Select date'}
+                  </button>
+                  {showFromCal && (
+                    <div className="mt-2 rounded-lg border p-2">
+                      <Calendar
+                        mode="single"
+                        selected={dateFrom}
+                        onSelect={(d:any) => { if (!d) return; if (dateTo && d > dateTo) setDateTo(d); setDateFrom(d); setShowFromCal(false) }}
+                        numberOfMonths={1}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div>
+                  <div className="text-xs text-muted-foreground mb-1">To</div>
+                  <button className="w-full text-left px-3 py-2 rounded-lg border bg-card border-border/50" onClick={() => { setShowToCal(v=>!v); setShowFromCal(false) }}>
+                    {dateTo ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateTo) : 'Select date'}
+                  </button>
+                  {showToCal && (
+                    <div className="mt-2 rounded-lg border p-2">
+                      <Calendar
+                        mode="single"
+                        selected={dateTo}
+                        onSelect={(d:any) => { if (!d) return; if (dateFrom && d < dateFrom) setDateFrom(d); setDateTo(d); setShowToCal(false) }}
+                        numberOfMonths={1}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <Button variant="destructive" onClick={() => { setTypes([]); setDateFrom(undefined); setDateTo(undefined); }}>Reset</Button>
+              <Button onClick={() => setIsFiltersOpen(false)}>Apply</Button>
             </div>
           </div>
         </BottomSheet>
@@ -362,27 +465,33 @@ export default function FiatTransactionsPage() {
               <SheetTitle>Sort</SheetTitle>
             </SheetHeader>
             <div className="min-h-0 overflow-y-auto px-4 pb-4">
-              <RadioGroup value={sortBy} onValueChange={setSortBy} className="gap-3">
+              <div className="grid gap-2">
                 {SORT_OPTIONS.map((option) => (
-                  <label key={option} className="flex items-center gap-3 py-1">
-                    <RadioGroupItem value={option} />
-                    <span className="text-sm">{option}</span>
-                  </label>
+                  <button
+                    key={option}
+                    className={`text-sm px-3 py-2 rounded-lg border text-left ${sortBy===option ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+                    onClick={() => setSortBy(option)}
+                  >
+                    {option}
+                  </button>
                 ))}
-              </RadioGroup>
+              </div>
             </div>
           </SheetContent>
         </Sheet>
       ) : (
         <BottomSheet open={showSortDialog} onOpenChange={setShowSortDialog} title="Sort">
-          <RadioGroup value={sortBy} onValueChange={setSortBy} className="gap-3">
+          <div className="grid gap-2">
             {SORT_OPTIONS.map((option) => (
-              <label key={option} className="flex items-center gap-3 py-1">
-                <RadioGroupItem value={option} />
-                <span className="text-sm">{option}</span>
-              </label>
+              <button
+                key={option}
+                className={`text-sm px-3 py-2 rounded-lg border text-left ${sortBy===option ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+                onClick={() => setSortBy(option)}
+              >
+                {option}
+              </button>
             ))}
-          </RadioGroup>
+          </div>
         </BottomSheet>
       )}
     </div>

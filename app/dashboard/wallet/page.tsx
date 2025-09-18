@@ -4,9 +4,8 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpRight, Copy, Percent, DollarSign, Coins, Building2, QrCode, Camera, Download, Upload } from "lucide-react"
-import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
+import { ArrowUpRight, ArrowDownLeft, Copy, Percent, DollarSign, Coins, Building2, QrCode, Camera, Download, Upload, SlidersHorizontal, Calendar as CalendarIcon, X } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -20,8 +19,10 @@ import WithdrawPanel from "@/components/wallet/WithdrawPanel"
 import WithdrawConfirmPanel from "@/components/wallet/WithdrawConfirmPanel"
 import BottomSheet from "@/components/ui/BottomSheet"
 import FiatTransactionsTable from "@/components/wallet/FiatTransactionsTable"
+import { SORT_OPTIONS } from "@/components/explorer/constants"
 import ManoraTransactionsTable from "@/components/wallet/ManoraTransactionsTable"
 import CameraScanner from "@/components/common/CameraScanner"
+import WalletHeaderCard from "@/components/wallet/WalletHeaderCard"
 
 // Move data outside component to prevent recreation on each render
 const tokenizedProperties = [
@@ -126,6 +127,16 @@ export default function WalletPage() {
   const manoraTokens = 1600
   const [showQrDialog, setShowQrDialog] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
+  // Mobile filters/sort state (reuse from fiat-transactions)
+  const [types, setTypes] = useState<Array<'deposit'|'withdraw'|'buy'|'sell'>>([])
+  const [showBar, setShowBar] = useState<boolean>(true)
+  const [showSortDialog, setShowSortDialog] = useState<boolean>(false)
+  const [isFiltersOpen, setIsFiltersOpen] = useState<boolean>(false)
+  const [sortBy, setSortBy] = useState<string>(SORT_OPTIONS[0])
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
+  const [showFromCal, setShowFromCal] = useState<boolean>(false)
+  const [showToCal, setShowToCal] = useState<boolean>(false)
 
   // Memoized calculations
   const totalTokenValue = useMemo(() => {
@@ -253,85 +264,88 @@ export default function WalletPage() {
         onScroll={onMobileScroll}
       >
         <div id="fiat-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
-          <div className="flex items-center justify-between">
-            <Button
-              size="icon"
-              variant="secondary"
-              className="rounded-full h-9 w-9 bg-sky-400/10 text-sky-400 hover:bg-sky-400/20"
-              aria-label="Deposit"
-              onClick={() => { setDepositCurrency('usd'); setDepositFiatOnly(true); setShowDepositDialog(true) }}
-            >
-              <Download className="h-5 w-5" />
-            </Button>
-            <div className="text-center">
-              <div className="text-xs text-muted-foreground">Balance</div>
-              <div className="text-3xl font-bold tracking-tight">
-                {new Intl.NumberFormat(locale === 'ar' ? 'ar' : 'en-US', { style: 'currency', currency: 'USD' }).format(totalUsdBalance)}
-              </div>
-            </div>
-            <Button
-              size="icon"
-              variant="secondary"
-              className="rounded-full h-9 w-9 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
-              aria-label="Withdraw"
-              onClick={() => { setWithdrawCurrency('usd'); setWithdrawMethod('bank'); setWithdrawFiatOnly(true); setShowWithdrawDialog(true) }}
-            >
-              <Upload className="h-5 w-5" />
-            </Button>
-          </div>
-          <div className="rounded-xl bg-card/50 p-2 mt-4">
-            <ChartContainer
-              config={{
-                balance: { label: 'Balance', color: '#38bdf8' },
-              }}
-              className="h-28 w-full"
-            >
-              <AreaChart data={walletTrendData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="balanceLine" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#7dd3fc" />
-                    <stop offset="100%" stopColor="#38bdf8" />
-                  </linearGradient>
-                </defs>
-                <YAxis hide />
-                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
-                {/* Glow layer */}
-                <Area type="monotone" dataKey="value" stroke="url(#balanceLine)" strokeWidth={8} fillOpacity={0} strokeOpacity={0.18} />
-                {/* Main line */}
-                <Area type="monotone" dataKey="value" stroke="url(#balanceLine)" strokeWidth={3} fillOpacity={0} />
-              </AreaChart>
-            </ChartContainer>
-          </div>
+          <WalletHeaderCard
+            centerLabel="Fiat Wallet"
+            value={totalUsdBalance}
+            locale={locale}
+            chartData={walletTrendData}
+            gradientStart="#7dd3fc"
+            gradientEnd="#38bdf8"
+            formatValue={(v, loc) => new Intl.NumberFormat(loc === 'ar' ? 'ar' : 'en-US', { style: 'currency', currency: 'USD' }).format(v)}
+            leftAction={(
+              <Button
+                size="icon"
+                variant="secondary"
+                className="rounded-full h-9 w-9 bg-sky-400/10 text-sky-400 hover:bg-sky-400/20"
+                aria-label="Deposit"
+                onClick={() => { setDepositCurrency('usd'); setDepositFiatOnly(true); setShowDepositDialog(true) }}
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+            )}
+            rightAction={(
+              <Button
+                size="icon"
+                variant="secondary"
+                className="rounded-full h-9 w-9 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                aria-label="Withdraw"
+                onClick={() => { setWithdrawCurrency('usd'); setWithdrawMethod('bank'); setWithdrawFiatOnly(true); setShowWithdrawDialog(true) }}
+              >
+                <Upload className="h-5 w-5" />
+              </Button>
+            )}
+          />
         </div>
 
-        <div id="mnr-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
-          <LatestBlockCard
-            label="Manora Wallet"
+        <div id="mnr-card" data-snap-item className="snap-center shrink-0 w-full min-w-full">
+          <WalletHeaderCard
+            centerLabel="Manora Wallet"
             value={manoraTokens}
-            subtitle="MNR"
             locale={locale}
-            gradientClassName="bg-gradient-to-br from-emerald-500 to-teal-600"
-            icon={Coins}
-            footerElement={
-              <div className="flex gap-2">
-                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'buy'})}>Buy</Button>
-                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'sell'})}>Sell</Button>
-                <Link href="/dashboard/wallet/manora-transactions" className="hidden sm:block">
-                  <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30">History</Button>
-                </Link>
-              </div>
-            }
+            chartData={walletTrendData}
+            gradientStart="#34d399"
+            gradientEnd="#0d9488"
+            valueAdornment={(
+              <span className="inline-flex items-center justify-center h-7 w-7 rounded-full bg-teal-500/10">
+                <span className="relative block h-5 w-5">
+                  <Image src="https://appoostobio.com/uploads/block_images/ec56e1051238fbf784ff56698ec327aa.png" alt="Manora" fill className="object-contain rounded-full" />
+                </span>
+              </span>
+            )}
+            leftAction={(
+              <Button
+                size="icon"
+                variant="secondary"
+                className="rounded-full h-9 w-9 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+                aria-label="Buy MNR"
+                onClick={() => setShowTradeMnr({mode:'buy'})}
+              >
+                <ArrowDownLeft className="h-5 w-5" />
+              </Button>
+            )}
+            rightAction={(
+              <Button
+                size="icon"
+                variant="secondary"
+                className="rounded-full h-9 w-9 bg-rose-500/10 text-rose-600 hover:bg-rose-500/20"
+                aria-label="Sell MNR"
+                onClick={() => setShowTradeMnr({mode:'sell'})}
+              >
+                <ArrowUpRight className="h-5 w-5" />
+              </Button>
+            )}
           />
         </div>
 
         <div id="re-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
-          <LatestBlockCard
-            label="Real Estate Wallet"
+          <WalletHeaderCard
+            centerLabel="Real Estate Wallet"
             value={totalTokenValue}
-            subtitle={`Across ${tokenizedProperties.length} properties`}
             locale={locale}
-            gradientClassName="bg-gradient-to-br from-rose-500 to-orange-500"
-            icon={Building2}
+            chartData={walletTrendData}
+            gradientStart="#fb7185"
+            gradientEnd="#f97316"
+            formatValue={(v, loc) => new Intl.NumberFormat(loc === 'ar' ? 'ar' : 'en-US', { style: 'currency', currency: 'USD' }).format(v)}
           />
         </div>
       </div>
@@ -345,6 +359,21 @@ export default function WalletPage() {
           />
         ))}
       </div>
+
+      {/* Toolbar Mobile sotto card Fiat: titolo + azioni */}
+      {activeCard === 0 && (
+        <div className="sm:hidden flex items-center justify-between mt-4 px-1">
+          <h3 className="text-lg font-semibold">Fiat Transactions</h3>
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" aria-label="Sort" onClick={() => setShowSortDialog(true)}>
+              <ArrowUpRight className="h-5 w-5 rotate-90" />
+            </Button>
+            <Button variant="ghost" size="icon" aria-label="Filters" onClick={() => setIsFiltersOpen(true)}>
+              <SlidersHorizontal className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {/* Desktop: griglia 3 colonne */}
       <div className="hidden sm:grid sm:gap-4 sm:grid-cols-3">
@@ -406,7 +435,7 @@ export default function WalletPage() {
       {/* Mobile-only: conditional content shown under active card */}
       <div className="sm:hidden">
         {activeCard === 0 && (
-          <FiatTransactionsTable />
+          <FiatTransactionsTable showTitle={false} types={types} sortBy={sortBy} />
         )}
         {activeCard === 1 && (
           <ManoraTransactionsTable />
@@ -538,6 +567,96 @@ export default function WalletPage() {
           </Card>
         </div>
       </div>
+
+      {/* Mobile Filters & Sort sheets, reusing components */}
+      <BottomSheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen} title="Filters">
+        <div className="space-y-5">
+          <div>
+            <div className="text-xs mb-1 text-muted-foreground">Type</div>
+            <div className="grid grid-cols-2 gap-2">
+              {(['deposit','withdraw','buy','sell'] as const).map(opt => (
+                <button
+                  key={opt}
+                  className={`text-sm px-3 py-2 rounded-lg border ${types.includes(opt) ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+                  onClick={() => setTypes(prev => prev.includes(opt) ? prev.filter(v => v !== opt) : [...prev, opt])}
+                >
+                  {opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs mb-1 text-muted-foreground">Date range</div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">From</div>
+                <div className="flex items-center gap-2">
+                  <button className="flex-1 text-left px-3 py-2 rounded-lg border bg-card border-border/50 inline-flex items-center gap-2" onClick={() => { setShowFromCal(v=>!v); setShowToCal(false) }}>
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <span>{dateFrom ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateFrom) : 'Select date'}</span>
+                  </button>
+                  {dateFrom && (
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDateFrom(undefined)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {showFromCal && (
+                  <div className="mt-2 inline-block rounded-lg border p-2 bg-card overflow-hidden">
+                    <Calendar
+                      mode="single"
+                      selected={dateFrom}
+                      onSelect={(d:any) => { if (!d) return; if (dateTo && d > dateTo) setDateTo(d); setDateFrom(d); setShowFromCal(false) }}
+                      numberOfMonths={1}
+                    />
+                  </div>
+                )}
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground mb-1">To</div>
+                <div className="flex items-center gap-2">
+                  <button className="flex-1 text-left px-3 py-2 rounded-lg border bg-card border-border/50 inline-flex items-center gap-2" onClick={() => { setShowToCal(v=>!v); setShowFromCal(false) }}>
+                    <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+                    <span>{dateTo ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(dateTo) : 'Select date'}</span>
+                  </button>
+                  {dateTo && (
+                    <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setDateTo(undefined)}>
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+                {showToCal && (
+                  <div className="mt-2 inline-block rounded-lg border p-2 bg-card overflow-hidden">
+                    <Calendar
+                      mode="single"
+                      selected={dateTo}
+                      onSelect={(d:any) => { if (!d) return; if (dateFrom && d < dateFrom) setDateFrom(d); setDateTo(d); setShowToCal(false) }}
+                      numberOfMonths={1}
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <Button variant="destructive" onClick={() => { setTypes([]); setDateFrom(undefined); setDateTo(undefined); }}>Reset</Button>
+            <Button onClick={() => setIsFiltersOpen(false)}>Apply</Button>
+          </div>
+        </div>
+      </BottomSheet>
+      <BottomSheet open={showSortDialog} onOpenChange={setShowSortDialog} title="Sort">
+        <div className="grid gap-2">
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option}
+              className={`text-sm px-3 py-2 rounded-lg border text-left ${sortBy===option ? 'bg-primary/10 border-primary/30 text-primary' : 'bg-card border-border/50'}`}
+              onClick={() => setSortBy(option)}
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      </BottomSheet>
 
       <DepositPanel
         open={showDepositDialog}
