@@ -30,7 +30,6 @@ import FiltersPanel from "@/components/explorer/FiltersPanel"
 import ProposalsList from "@/components/explorer/ProposalsList"
 import { useI18n } from "@/components/i18n-provider"
 import LatestBlockCard from "@/components/explorer/cards/LatestBlockCard"
-import TokenMetricsCard from "@/components/explorer/cards/TokenMetricsCard"
 import SmartContractsSummaryCard from "@/components/explorer/cards/SmartContractsSummaryCard"
 import NetworkHealthCard from "@/components/explorer/cards/NetworkHealthCard"
 import TopValidatorsList from "@/components/explorer/TopValidatorsList"
@@ -188,7 +187,7 @@ export default function ExplorerPage() {
       {tabValue === 'transactions' && (
         <div className="flex gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:grid sm:gap-4 sm:grid-cols-2 lg:grid-cols-4 sm:overflow-x-hidden sm:snap-none">
           <LatestBlockCard label={t('explorer.kpi.latestBlock')} value={kpis.latestBlock} />
-          <TokenMetricsCard title="MANORA Token" priceLabel="Price" supplyLabel="Total Supply" price={tokenMetrics.price} totalSupply={tokenMetrics.totalSupply} />
+          <LatestBlockCard label={"Total Transactions"} value={kpis.totalTransactions as any} gradientClassName="bg-gradient-to-br from-emerald-500 to-teal-600" />
           <SmartContractsSummaryCard title="Smart Contracts" activeLabel="Active" verifiedLabel="Verified" activeCount={activeSmartContracts.length} verifiedCount={activeSmartContracts.filter(c => c.verified).length} />
           <NetworkHealthCard
             title={t('explorer.networkHealth')}

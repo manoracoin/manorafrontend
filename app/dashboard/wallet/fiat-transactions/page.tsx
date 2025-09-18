@@ -7,56 +7,62 @@ import { Card } from "@/components/ui/card"
 import { ArrowLeft } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
+import Image from "next/image"
+import { ArrowDownLeft, ArrowUpRight, Banknote, ChevronRight, SlidersHorizontal, ArrowUpDown } from "lucide-react"
 import { Pagination, PaginationContent, PaginationFirst, PaginationItem, PaginationLast, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
+import { SORT_OPTIONS } from "@/components/explorer/constants"
+import BottomSheet from "@/components/ui/BottomSheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Checkbox } from "@/components/ui/checkbox"
 
-type FiatTx = {
-  id: string
-  type: 'deposit' | 'withdraw' | 'buy'
-  amount: number
-  currency: 'USD'
-  from: string
-  to: string
-  timestamp: string
-  status: 'success' | 'failed'
-}
-
-const fiatTransactions: FiatTx[] = [
-  { id: 'ftx_1001', type: 'deposit', amount: 1250, currency: 'USD', from: 'Bank ****3421', to: 'Your Fiat Wallet', timestamp: '2024-03-20T10:30:00', status: 'success' },
-  { id: 'ftx_1002', type: 'withdraw', amount: 750, currency: 'USD', from: 'Your Fiat Wallet', to: 'Bank ****3421', timestamp: '2024-03-19T15:45:00', status: 'success' },
-  { id: 'ftx_1003', type: 'deposit', amount: 2000, currency: 'USD', from: 'Bank ****9981', to: 'Your Fiat Wallet', timestamp: '2024-03-18T09:15:00', status: 'success' },
-  { id: 'ftx_1004', type: 'buy', amount: 500, currency: 'USD', from: 'Your Fiat Wallet', to: 'Buy MNR (200 MNR)', timestamp: '2024-03-17T12:00:00', status: 'success' },
-  { id: 'ftx_1005', type: 'withdraw', amount: 320, currency: 'USD', from: 'Your Fiat Wallet', to: 'Bank ****3421', timestamp: '2024-03-16T16:20:00', status: 'success' },
-  { id: 'ftx_1006', type: 'deposit', amount: 980, currency: 'USD', from: 'Bank ****9981', to: 'Your Fiat Wallet', timestamp: '2024-03-15T11:05:00', status: 'success' },
-  { id: 'ftx_1007', type: 'buy', amount: 260, currency: 'USD', from: 'Your Fiat Wallet', to: 'Buy MNR (104 MNR)', timestamp: '2024-03-14T13:50:00', status: 'success' },
-  { id: 'ftx_1008', type: 'withdraw', amount: 120, currency: 'USD', from: 'Your Fiat Wallet', to: 'Bank ****3421', timestamp: '2024-03-13T08:40:00', status: 'success' },
-  { id: 'ftx_1009', type: 'deposit', amount: 450, currency: 'USD', from: 'Bank ****3421', to: 'Your Fiat Wallet', timestamp: '2024-03-12T18:25:00', status: 'success' },
-  { id: 'ftx_1010', type: 'buy', amount: 800, currency: 'USD', from: 'Your Fiat Wallet', to: 'Buy MNR (320 MNR)', timestamp: '2024-03-11T10:10:00', status: 'success' },
-  { id: 'ftx_1011', type: 'withdraw', amount: 210, currency: 'USD', from: 'Your Fiat Wallet', to: 'Bank ****9981', timestamp: '2024-03-10T12:30:00', status: 'success' },
-  { id: 'ftx_1012', type: 'deposit', amount: 700, currency: 'USD', from: 'Bank ****3421', to: 'Your Fiat Wallet', timestamp: '2024-03-09T09:00:00', status: 'success' },
-  { id: 'ftx_1013', type: 'buy', amount: 150, currency: 'USD', from: 'Your Fiat Wallet', to: 'Buy MNR (60 MNR)', timestamp: '2024-03-08T14:45:00', status: 'success' },
-  { id: 'ftx_1014', type: 'withdraw', amount: 430, currency: 'USD', from: 'Your Fiat Wallet', to: 'Bank ****3421', timestamp: '2024-03-07T17:05:00', status: 'success' },
-  { id: 'ftx_1015', type: 'deposit', amount: 1600, currency: 'USD', from: 'Bank ****9981', to: 'Your Fiat Wallet', timestamp: '2024-03-06T07:55:00', status: 'success' },
-  { id: 'ftx_1016', type: 'buy', amount: 350, currency: 'USD', from: 'Your Fiat Wallet', to: 'Buy MNR (140 MNR)', timestamp: '2024-03-05T19:35:00', status: 'success' },
-]
+import { fiatTransactions } from "@/components/wallet/fiatData"
 
 export default function FiatTransactionsPage() {
   const router = useRouter()
-  const [searchValue, setSearchValue] = React.useState("")
-  const [type, setType] = React.useState<string>('all')
+  const [types, setTypes] = React.useState<Array<'deposit'|'withdraw'|'buy'|'sell'>>([])
   const [page, setPage] = React.useState<number>(1)
   const [pageSize, setPageSize] = React.useState<number>(10)
   const [showBar, setShowBar] = React.useState<boolean>(true)
+  const [isFiltersOpen, setIsFiltersOpen] = React.useState<boolean>(false)
+  const [showSortDialog, setShowSortDialog] = React.useState<boolean>(false)
+  const [sortBy, setSortBy] = React.useState<string>(SORT_OPTIONS[0])
+  const [isDesktop, setIsDesktop] = React.useState<boolean>(false)
+  const [expanded, setExpanded] = React.useState<Record<string, boolean>>({})
+
+  React.useEffect(() => {
+    const mql = window.matchMedia('(min-width: 640px)')
+    const listener = (e: MediaQueryListEvent) => setIsDesktop(e.matches)
+    setIsDesktop(mql.matches)
+    mql.addEventListener ? mql.addEventListener('change', listener) : mql.addListener(listener)
+    return () => { mql.removeEventListener ? mql.removeEventListener('change', listener) : mql.removeListener(listener) }
+  }, [])
 
   const filtered = React.useMemo(() => {
-    const q = searchValue.trim().toLowerCase()
     return fiatTransactions.filter(tx =>
-      (type === 'all' ? true : tx.type === (type as any)) &&
-      (q ? tx.id.toLowerCase().includes(q) || tx.from.toLowerCase().includes(q) || tx.to.toLowerCase().includes(q) : true)
+      (types.length === 0 ? true : types.includes(tx.type as any))
     )
-  }, [searchValue, type])
+  }, [types])
 
-  React.useEffect(() => { setPage(1) }, [searchValue, type, pageSize])
+  const toggleType = (value: 'deposit'|'withdraw'|'buy'|'sell') => {
+    setTypes(prev => prev.includes(value) ? prev.filter(v => v !== value) : [...prev, value])
+  }
+
+  const sorted = React.useMemo(() => {
+    const arr = [...filtered]
+    switch (sortBy) {
+      case 'Oldest First':
+        return arr.sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+      case 'Value: High to Low':
+        return arr.sort((a, b) => b.amount - a.amount)
+      case 'Value: Low to High':
+        return arr.sort((a, b) => a.amount - b.amount)
+      default:
+        return arr.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+    }
+  }, [filtered, sortBy])
+
+  React.useEffect(() => { setPage(1) }, [types, pageSize, sortBy])
 
   React.useEffect(() => {
     const scroller = document.querySelector('main') as HTMLElement | null
@@ -72,10 +78,42 @@ export default function FiatTransactionsPage() {
     return () => scroller.removeEventListener('scroll', onScroll)
   }, [])
 
-  const totalItems = filtered.length
+  const totalItems = sorted.length
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize))
   const currentPage = Math.min(page, totalPages)
-  const paginated = React.useMemo(() => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filtered, currentPage, pageSize])
+  const paginated = React.useMemo(() => sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize), [sorted, currentPage, pageSize])
+
+  const timeFmt = React.useMemo(() => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }), [])
+  const dateKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`
+  const dayLabel = (d: Date) => {
+    const today = new Date()
+    const yest = new Date(today)
+    yest.setDate(today.getDate()-1)
+    const dk = dateKey(d)
+    if (dk === dateKey(today)) return 'Today'
+    if (dk === dateKey(yest)) return 'Yesterday'
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(d)
+  }
+  const groups = React.useMemo(() => {
+    const items = paginated
+    const orderKeys: string[] = []
+    const keyToData: Record<string, { label: string, items: typeof paginated, net: number }> = {}
+    for (const tx of items) {
+      const d = new Date(tx.timestamp)
+      const k = dateKey(d)
+      if (!keyToData[k]) {
+        orderKeys.push(k)
+        keyToData[k] = { label: dayLabel(d), items: [] as any, net: 0 }
+      }
+      keyToData[k].items.push(tx)
+      const delta = (tx.type === 'deposit' || tx.type === 'sell') ? tx.amount : -tx.amount
+      keyToData[k].net += delta
+    }
+    return orderKeys.map(k => keyToData[k])
+  }, [paginated])
+
+  const toggleExpand = (id: string) => setExpanded(prev => ({ ...prev, [id]: !prev[id] }))
+
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3 justify-between">
@@ -86,61 +124,166 @@ export default function FiatTransactionsPage() {
           </Button>
           <h2 className="text-xl sm:text-3xl font-semibold sm:font-bold tracking-tight">Fiat Transactions</h2>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="relative w-[260px]">
-            <Input placeholder="Search..." className="pl-3 pr-3" value={searchValue} onChange={(e)=>setSearchValue(e.target.value)} />
-          </div>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger className="w-[140px]"><SelectValue placeholder="Type" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All types</SelectItem>
-              <SelectItem value="deposit">Deposit</SelectItem>
-              <SelectItem value="withdraw">Withdraw</SelectItem>
-              <SelectItem value="buy">Buy MNR</SelectItem>
-              <SelectItem value="sell">Sell MNR</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" aria-label="Sort" onClick={() => setShowSortDialog(true)}>
+            <ArrowUpDown className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label="Filters" onClick={() => setIsFiltersOpen(true)}>
+            <SlidersHorizontal className="h-5 w-5" />
+          </Button>
         </div>
       </div>
 
       <Card className="p-0 sm:p-6 border-0 rounded-none bg-transparent sm:border sm:rounded-lg sm:bg-card">
-        <div className="hidden sm:grid grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr_0.7fr] px-3 py-2 text-xs uppercase text-muted-foreground">
-          <span>Tx</span>
-          <span>Time</span>
-          <span>From</span>
-          <span>To</span>
-          <span>Type</span>
-          <span>Amount</span>
-        </div>
-        <div className="space-y-2">
-          {paginated.map((tx) => (
-            <div key={tx.id} className="p-3 rounded-lg border bg-card/50">
-              <div className="hidden sm:grid items-center grid-cols-[1.2fr_1fr_1fr_1fr_0.8fr_0.7fr] gap-2">
-                <div className="font-mono text-sm truncate">{tx.id}</div>
-                <div className="text-sm text-muted-foreground">{new Date(tx.timestamp).toLocaleString()}</div>
-                <div className="text-sm truncate">{tx.from}</div>
-                <div className="text-sm truncate">{tx.to}</div>
-                <div className="text-sm">
-                  <Badge variant="secondary" className={tx.type==='deposit'?'bg-green-500/10 text-green-600':tx.type==='withdraw'?'bg-blue-500/10 text-blue-600':tx.type==='buy'?'bg-emerald-500/10 text-emerald-600':'bg-amber-500/10 text-amber-600'}>
-                    {tx.type}
-                  </Badge>
-                </div>
-                <div className="text-sm">${tx.amount.toLocaleString()}</div>
+        <div className="space-y-3">
+          {groups.map((group) => (
+            <div key={group.label} className="space-y-2">
+              <div className="flex items-center gap-2 px-3 py-1 text-xs uppercase text-muted-foreground">
+                <span>{group.label}</span>
+                <span className={group.net > 0 ? 'text-green-600' : group.net < 0 ? 'text-red-600' : ''}>
+                  {group.net > 0 ? `+$${group.net.toLocaleString()}` : group.net < 0 ? `-$${Math.abs(group.net).toLocaleString()}` : '$0'}
+                </span>
               </div>
-              <div className="sm:hidden">
-                <div className="flex items-center justify-between">
-                  <div className="font-mono text-sm">{tx.id}</div>
-                  <Badge variant="secondary" className={tx.type==='deposit'?'bg-green-500/10 text-green-600':tx.type==='withdraw'?'bg-blue-500/10 text-blue-600':tx.type==='buy'?'bg-emerald-500/10 text-emerald-600':'bg-amber-500/10 text-amber-600'}>
-                    {tx.type}
-                  </Badge>
+              {group.items.map((tx) => (
+                <div key={tx.id} className="p-3 rounded-lg border bg-card/50">
+                  <div className="hidden sm:grid items-center grid-cols-[0.5fr_1.2fr_1fr_1fr_1fr_0.7fr] gap-2">
+                    {tx.type==='buy' || tx.type==='sell' ? (
+                      <div className="flex items-center gap-1">
+                        {tx.type==='sell' ? (
+                          <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600`}>
+                            <div className="relative h-4 w-4">
+                              <Image src="https://appoostobio.com/uploads/block_images/ec56e1051238fbf784ff56698ec327aa.png" alt="Manora" fill className="object-contain rounded-full" />
+                            </div>
+                          </div>
+                        ) : (
+                          <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600`}>
+                            <Banknote className="h-4 w-4" />
+                          </div>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                        {tx.type==='sell' ? (
+                          <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600`}>
+                            <Banknote className="h-4 w-4" />
+                          </div>
+                        ) : (
+                          <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600`}>
+                            <div className="relative h-4 w-4">
+                              <Image src="https://appoostobio.com/uploads/block_images/ec56e1051238fbf784ff56698ec327aa.png" alt="Manora" fill className="object-contain rounded-full" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <div className={
+                        `h-7 w-7 rounded-full flex items-center justify-center ${
+                          tx.type==='deposit' ? 'bg-green-500/10 text-green-600' :
+                          tx.type==='withdraw' ? 'bg-blue-500/10 text-blue-600' :
+                          'bg-emerald-500/10 text-emerald-600'
+                        }`
+                      }>
+                        {tx.type==='deposit' && (<ArrowDownLeft className="h-4 w-4" />)}
+                        {tx.type==='withdraw' && (<ArrowUpRight className="h-4 w-4" />)}
+                      </div>
+                    )}
+                    <div className="font-mono text-sm truncate">{tx.id}</div>
+                    <div className="text-sm text-muted-foreground">{timeFmt.format(new Date(tx.timestamp))}</div>
+                    <div className="text-sm truncate">{tx.from}</div>
+                    <div className="text-sm truncate">{tx.to}</div>
+                    <div className="text-sm">
+                      {tx.type==='buy' ? (
+                        <span>
+                          <span className="text-red-600">-{`$${tx.amount.toLocaleString()}`}</span>
+                          <span> / </span>
+                          <span className="text-green-600">+{`${tx.mnrAmount?.toLocaleString()} MNR`}</span>
+                        </span>
+                      ) : tx.type==='sell' ? (
+                        <span>
+                          <span className="text-green-600">+{`$${tx.amount.toLocaleString()}`}</span>
+                          <span> / </span>
+                          <span className="text-red-600">-{`${tx.mnrAmount?.toLocaleString()} MNR`}</span>
+                        </span>
+                      ) : (
+                        <span className={tx.type==='deposit' ? 'text-green-600' : 'text-red-600'}>
+                          {tx.type==='deposit' ? `+$${tx.amount.toLocaleString()}` : `-$${tx.amount.toLocaleString()}`}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="sm:hidden cursor-pointer" onClick={() => toggleExpand(tx.id)}>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        {tx.type==='buy' || tx.type==='sell' ? (
+                          <div className="flex items-center gap-1">
+                            {tx.type==='sell' ? (
+                              <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600`}>
+                                <div className="relative h-4 w-4">
+                                  <Image src="https://appoostobio.com/uploads/block_images/ec56e1051238fbf784ff56698ec327aa.png" alt="Manora" fill className="object-contain rounded-full" />
+                                </div>
+                              </div>
+                            ) : (
+                              <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600`}>
+                                <Banknote className="h-4 w-4" />
+                              </div>
+                            )}
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            {tx.type==='sell' ? (
+                              <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-emerald-500/10 text-emerald-600`}>
+                                <Banknote className="h-4 w-4" />
+                              </div>
+                            ) : (
+                              <div className={`h-7 w-7 rounded-full flex items-center justify-center bg-teal-500/10 text-teal-600`}>
+                                <div className="relative h-4 w-4">
+                                  <Image src="https://appoostobio.com/uploads/block_images/ec56e1051238fbf784ff56698ec327aa.png" alt="Manora" fill className="object-contain rounded-full" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className={
+                            `h-7 w-7 rounded-full flex items-center justify-center ${
+                              tx.type==='deposit' ? 'bg-green-500/10 text-green-600' :
+                              tx.type==='withdraw' ? 'bg-blue-500/10 text-blue-600' :
+                              'bg-emerald-500/10 text-emerald-600'
+                            }`
+                          }>
+                            {tx.type==='deposit' && (<ArrowDownLeft className="h-4 w-4" />)}
+                            {tx.type==='withdraw' && (<ArrowUpRight className="h-4 w-4" />)}
+                          </div>
+                        )}
+                        <span className="text-xs text-muted-foreground">{timeFmt.format(new Date(tx.timestamp))}</span>
+                      </div>
+                      <div className="text-sm font-medium">
+                        {tx.type==='buy' ? (
+                          <span>
+                            <span className="text-red-600">-{`$${tx.amount.toLocaleString()}`}</span>
+                            <span> / </span>
+                            <span className="text-green-600">+{`${tx.mnrAmount?.toLocaleString()} MNR`}</span>
+                          </span>
+                        ) : tx.type==='sell' ? (
+                          <span>
+                            <span className="text-green-600">+{`$${tx.amount.toLocaleString()}`}</span>
+                            <span> / </span>
+                            <span className="text-red-600">-{`${tx.mnrAmount?.toLocaleString()} MNR`}</span>
+                          </span>
+                        ) : (
+                          <span className={tx.type==='deposit' ? 'text-green-600' : 'text-red-600'}>
+                            {tx.type==='deposit' ? `+$${tx.amount.toLocaleString()}` : `-$${tx.amount.toLocaleString()}`}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {expanded[tx.id] && (
+                      <div className="mt-2 space-y-1">
+                        <div className="font-mono text-xs break-all">{tx.id}</div>
+                        <div className="text-sm truncate">{tx.from} → {tx.to}</div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="mt-1 text-xs text-muted-foreground">{new Date(tx.timestamp).toLocaleString()}</div>
-                <div className="mt-1 text-sm truncate">{tx.from} → {tx.to}</div>
-                <div className="mt-1 text-sm font-medium">${tx.amount.toLocaleString()}</div>
-              </div>
+              ))}
             </div>
           ))}
-          {filtered.length === 0 && (
+          {sorted.length === 0 && (
             <div className="text-sm text-muted-foreground">No fiat transactions.</div>
           )}
         </div>
@@ -168,6 +311,80 @@ export default function FiatTransactionsPage() {
         </div>
         <div className="h-28 sm:hidden" />
       </Card>
+
+      {/* Filters: BottomSheet on mobile, Drawer (Sheet) on desktop */}
+      {isDesktop ? (
+        <Sheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen}>
+          <SheetContent side="right" className="sm:max-w-md w-[90vw] p-0 flex flex-col">
+            <SheetHeader className="px-4 pt-4">
+              <SheetTitle>Filters</SheetTitle>
+            </SheetHeader>
+            <div className="min-h-0 overflow-y-auto px-4 pb-4">
+              <div className="space-y-3">
+                <div>
+                  <div className="text-xs mb-1 text-muted-foreground">Type</div>
+                  <div className="space-y-2">
+                    {(['deposit','withdraw','buy','sell'] as const).map(opt => (
+                      <label key={opt} className="flex items-center gap-3">
+                        <Checkbox checked={types.includes(opt)} onCheckedChange={() => toggleType(opt)} />
+                        <span className="text-sm capitalize">{opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <BottomSheet open={isFiltersOpen} onOpenChange={setIsFiltersOpen} title="Filters">
+          <div className="space-y-3">
+            <div>
+              <div className="text-xs mb-1 text-muted-foreground">Type</div>
+              <div className="space-y-2">
+                {(['deposit','withdraw','buy','sell'] as const).map(opt => (
+                  <label key={opt} className="flex items-center gap-3">
+                    <Checkbox checked={types.includes(opt)} onCheckedChange={() => toggleType(opt)} />
+                    <span className="text-sm capitalize">{opt === 'buy' ? 'Buy MNR' : opt === 'sell' ? 'Sell MNR' : opt}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </BottomSheet>
+      )}
+
+      {/* Sort: BottomSheet on mobile, Drawer (Sheet) on desktop */}
+      {isDesktop ? (
+        <Sheet open={showSortDialog} onOpenChange={setShowSortDialog}>
+          <SheetContent side="right" className="sm:max-w-md w-[90vw] p-0 flex flex-col">
+            <SheetHeader className="px-4 pt-4">
+              <SheetTitle>Sort</SheetTitle>
+            </SheetHeader>
+            <div className="min-h-0 overflow-y-auto px-4 pb-4">
+              <RadioGroup value={sortBy} onValueChange={setSortBy} className="gap-3">
+                {SORT_OPTIONS.map((option) => (
+                  <label key={option} className="flex items-center gap-3 py-1">
+                    <RadioGroupItem value={option} />
+                    <span className="text-sm">{option}</span>
+                  </label>
+                ))}
+              </RadioGroup>
+            </div>
+          </SheetContent>
+        </Sheet>
+      ) : (
+        <BottomSheet open={showSortDialog} onOpenChange={setShowSortDialog} title="Sort">
+          <RadioGroup value={sortBy} onValueChange={setSortBy} className="gap-3">
+            {SORT_OPTIONS.map((option) => (
+              <label key={option} className="flex items-center gap-3 py-1">
+                <RadioGroupItem value={option} />
+                <span className="text-sm">{option}</span>
+              </label>
+            ))}
+          </RadioGroup>
+        </BottomSheet>
+      )}
     </div>
   )
 }

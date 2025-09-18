@@ -235,6 +235,7 @@ export const KPIS = {
   avgGasFee: "$2.45",
   tokenPrice: "$3,245",
   activeNodes: 4523,
+  totalTransactions: 1234567,
 }
 
 export const NETWORK_HEALTH = {

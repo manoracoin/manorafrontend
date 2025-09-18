@@ -4,7 +4,9 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Card } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { ArrowUpRight, ArrowDownLeft, Copy, Percent, DollarSign, Coins, Building2, QrCode, Camera } from "lucide-react"
+import { ArrowUpRight, Copy, Percent, DollarSign, Coins, Building2, QrCode, Camera, Download, Upload } from "lucide-react"
+import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from "recharts"
+import { ChartContainer, ChartTooltip, ChartTooltipContent } from "@/components/ui/chart"
 import Link from "next/link"
 import Image from "next/image"
 import { useRouter } from "next/navigation"
@@ -121,6 +123,7 @@ export default function WalletPage() {
   const [showTradeMnr, setShowTradeMnr] = useState<{mode:'buy'|'sell'}|null>(null)
   const [tradeMnrAmount, setTradeMnrAmount] = useState("")
   const rateUsdPerMnr = 2.5
+  const manoraTokens = 1600
   const [showQrDialog, setShowQrDialog] = useState(false)
   const [showScanner, setShowScanner] = useState(false)
 
@@ -145,6 +148,18 @@ export default function WalletPage() {
     const amount = parseFloat(withdrawAmount)
     return amount - withdrawFee
   }, [withdrawAmount, withdrawFee])
+
+  // Bilancio totale in USD (fiat + MNR convertito + real estate)
+  const totalUsdBalance = useMemo(() => {
+    return 4500 + manoraTokens * rateUsdPerMnr + totalTokenValue
+  }, [totalTokenValue, manoraTokens, rateUsdPerMnr])
+
+  // Dati per grafico andamento wallet: oscillazioni marcate (percentuali su base)
+  const walletTrendData = useMemo(() => {
+    const perc = [-0.20, 0.10, -0.11, 0.03, -0.18, 0.08, -0.14, 0.05, -0.22, 0.12, -0.10, 0.06]
+    const base = totalUsdBalance
+    return perc.map((p, i) => ({ idx: i, value: Math.round(base * (1 + p)) }))
+  }, [totalUsdBalance])
 
   // Event handlers
   const [walletUrl, setWalletUrl] = useState("")
@@ -182,27 +197,40 @@ export default function WalletPage() {
 
   // Responsive switching è gestito dentro i pannelli estratti
 
-  // Track which card is currently in view on mobile
+  // Track active card on mobile via scroll position
   const [activeCard, setActiveCard] = useState<number>(0)
   const scrollerRef = useRef<HTMLDivElement | null>(null)
-  useEffect(() => {
-    const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches
-    if (isDesktop) return
-    const ids = ['fiat-card','mnr-card','re-card']
-    const elements = ids.map(id => document.getElementById(id)).filter(Boolean) as HTMLElement[]
-    if (elements.length === 0) return
-    const observer = new IntersectionObserver((entries) => {
-      const visible = entries
-        .filter(e => e.isIntersecting)
-        .sort((a,b)=> b.intersectionRatio - a.intersectionRatio)[0]
-      if (visible) {
-        const idx = ids.indexOf(visible.target.id)
-        if (idx !== -1) setActiveCard(idx)
+  const scrollRafRef = useRef<number | null>(null)
+  const updateActiveFromScroll = useCallback(() => {
+    const container = scrollerRef.current
+    if (!container) return
+    const center = container.scrollLeft + container.clientWidth / 2
+    const items = Array.from(container.querySelectorAll('[data-snap-item]')) as HTMLElement[]
+    let nearest = 0
+    let minDist = Infinity
+    items.forEach((el, idx) => {
+      const elCenter = el.offsetLeft + el.offsetWidth / 2
+      const dist = Math.abs(elCenter - center)
+      if (dist < minDist) {
+        minDist = dist
+        nearest = idx
       }
-    }, { root: scrollerRef.current, rootMargin: "0px -15% 0px -15%", threshold: [0.2, 0.5, 0.8] })
-    elements.forEach(el => observer.observe(el))
-    return () => observer.disconnect()
+    })
+    setActiveCard(nearest)
   }, [])
+
+  const onMobileScroll = useCallback(() => {
+    if (scrollRafRef.current) cancelAnimationFrame(scrollRafRef.current)
+    scrollRafRef.current = requestAnimationFrame(updateActiveFromScroll)
+  }, [updateActiveFromScroll])
+
+  useEffect(() => {
+    updateActiveFromScroll()
+    const container = scrollerRef.current
+    if (!container) return
+    container.addEventListener('scroll', onMobileScroll, { passive: true })
+    return () => container.removeEventListener('scroll', onMobileScroll)
+  }, [onMobileScroll, updateActiveFromScroll])
 
   return (
     <div className="space-y-6">
@@ -218,7 +246,108 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <div ref={scrollerRef} className="flex gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:grid sm:gap-4 sm:grid-cols-3 sm:overflow-x-hidden sm:snap-none">
+      {/* Mobile: riga scrollabile con 3 "schede" (header+grafico, MNR, RE) */}
+      <div
+        ref={scrollerRef}
+        className="flex gap-3 overflow-x-auto overflow-y-hidden snap-x snap-mandatory sm:hidden [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={onMobileScroll}
+      >
+        <div id="fiat-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
+          <div className="flex items-center justify-between">
+            <Button
+              size="icon"
+              variant="secondary"
+              className="rounded-full h-9 w-9 bg-sky-400/10 text-sky-400 hover:bg-sky-400/20"
+              aria-label="Deposit"
+              onClick={() => { setDepositCurrency('usd'); setDepositFiatOnly(true); setShowDepositDialog(true) }}
+            >
+              <Download className="h-5 w-5" />
+            </Button>
+            <div className="text-center">
+              <div className="text-xs text-muted-foreground">Balance</div>
+              <div className="text-3xl font-bold tracking-tight">
+                {new Intl.NumberFormat(locale === 'ar' ? 'ar' : 'en-US', { style: 'currency', currency: 'USD' }).format(totalUsdBalance)}
+              </div>
+            </div>
+            <Button
+              size="icon"
+              variant="secondary"
+              className="rounded-full h-9 w-9 bg-emerald-500/10 text-emerald-600 hover:bg-emerald-500/20"
+              aria-label="Withdraw"
+              onClick={() => { setWithdrawCurrency('usd'); setWithdrawMethod('bank'); setWithdrawFiatOnly(true); setShowWithdrawDialog(true) }}
+            >
+              <Upload className="h-5 w-5" />
+            </Button>
+          </div>
+          <div className="rounded-xl bg-card/50 p-2 mt-4">
+            <ChartContainer
+              config={{
+                balance: { label: 'Balance', color: '#38bdf8' },
+              }}
+              className="h-28 w-full"
+            >
+              <AreaChart data={walletTrendData} margin={{ left: 8, right: 8, top: 8, bottom: 0 }}>
+                <defs>
+                  <linearGradient id="balanceLine" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#7dd3fc" />
+                    <stop offset="100%" stopColor="#38bdf8" />
+                  </linearGradient>
+                </defs>
+                <YAxis hide />
+                <ChartTooltip cursor={false} content={<ChartTooltipContent hideLabel />} />
+                {/* Glow layer */}
+                <Area type="monotone" dataKey="value" stroke="url(#balanceLine)" strokeWidth={8} fillOpacity={0} strokeOpacity={0.18} />
+                {/* Main line */}
+                <Area type="monotone" dataKey="value" stroke="url(#balanceLine)" strokeWidth={3} fillOpacity={0} />
+              </AreaChart>
+            </ChartContainer>
+          </div>
+        </div>
+
+        <div id="mnr-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
+          <LatestBlockCard
+            label="Manora Wallet"
+            value={manoraTokens}
+            subtitle="MNR"
+            locale={locale}
+            gradientClassName="bg-gradient-to-br from-emerald-500 to-teal-600"
+            icon={Coins}
+            footerElement={
+              <div className="flex gap-2">
+                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'buy'})}>Buy</Button>
+                <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30" onClick={() => setShowTradeMnr({mode:'sell'})}>Sell</Button>
+                <Link href="/dashboard/wallet/manora-transactions" className="hidden sm:block">
+                  <Button size="sm" variant="secondary" className="bg-white/20 hover:bg-white/30 border-white/30">History</Button>
+                </Link>
+              </div>
+            }
+          />
+        </div>
+
+        <div id="re-card" data-snap-item className="snap-center shrink-0 w-full min-w-[85%]">
+          <LatestBlockCard
+            label="Real Estate Wallet"
+            value={totalTokenValue}
+            subtitle={`Across ${tokenizedProperties.length} properties`}
+            locale={locale}
+            gradientClassName="bg-gradient-to-br from-rose-500 to-orange-500"
+            icon={Building2}
+          />
+        </div>
+      </div>
+
+      {/* Indicatori di pagina (mobile) */}
+      <div className="sm:hidden flex items-center justify-center gap-2 mt-2">
+        {[0,1,2].map((i) => (
+          <span
+            key={i}
+            className={`h-1.5 rounded-full transition-all ${activeCard === i ? 'bg-sky-400 w-4' : 'bg-muted-foreground/30 w-1.5'}`}
+          />
+        ))}
+      </div>
+
+      {/* Desktop: griglia 3 colonne */}
+      <div className="hidden sm:grid sm:gap-4 sm:grid-cols-3">
         <LatestBlockCard
           // @ts-ignore ids used only for mobile observer
           id="fiat-card"
@@ -248,7 +377,7 @@ export default function WalletPage() {
         <LatestBlockCard
           id="mnr-card"
           label="Manora Wallet"
-          value={1600}
+          value={manoraTokens}
           subtitle="MNR"
           locale={locale}
           gradientClassName="bg-gradient-to-br from-emerald-500 to-teal-600"
